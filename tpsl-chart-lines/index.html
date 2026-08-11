@@ -88,9 +88,17 @@
   .taxis span{position:absolute; top:3px; transform:translateX(-50%); font-family:var(--mono); font-size:8.5px; color:var(--ink3)}
   .latest{position:absolute; right:80px; top:2px; font-family:var(--mono); font-size:9px; padding:0 5px; border-radius:4px;
           background:var(--blueBg); color:var(--blue); border:1px solid #C7DBFF; cursor:pointer; line-height:13px}
-  .axis div{position:absolute; right:5px; font-family:var(--mono); font-size:8.5px; color:var(--ink3); transform:translateY(-50%); white-space:nowrap}
-  .chip{position:absolute; right:8px; transform:translateY(-50%); font-family:var(--mono); font-size:10.5px; font-weight:600;
-        padding:2px 6px; border-radius:5px; white-space:nowrap; border:1px solid; cursor:pointer}
+  .axis .tick{position:absolute; right:5px; font-family:var(--mono); font-size:8.5px; color:var(--ink3); transform:translateY(-50%); white-space:nowrap}
+  /* price scale badge. must be fully opaque: over a real TradingView price scale we cannot
+     hide the library's own tick labels, so the badge has to occlude them. */
+  .pbadge{position:absolute; right:2px; transform:translateY(-50%); font-family:var(--mono); font-size:8.5px;
+          font-weight:600; color:#fff; padding:2px 4px; border-radius:3px; white-space:nowrap; line-height:1.15}
+  /* segmented pill, same anatomy as the existing position line label */
+  .chip{position:absolute; right:8px; transform:translateY(-50%); display:flex; align-items:stretch;
+        font-family:var(--mono); font-size:10px; font-weight:600; border-radius:5px; white-space:nowrap;
+        border:1px solid; overflow:hidden; background:#fff; cursor:pointer}
+  .chip i{font-style:normal; padding:2px 5px}
+  .chip i + i{border-left:1px solid}
   .oline{position:absolute; left:0; right:0; border-top-width:1px; border-top-style:solid}
   .edge{position:absolute; right:8px; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:5px;
         background:#fff; border:1px solid var(--line2); color:var(--ink2)}
@@ -169,30 +177,42 @@
     <tr>
       <td><b>Resolved</b></td>
       <td>Every gap &ge; 24px</td>
-      <td>One line and one full label per order, price and qty visible</td>
+      <td>One line per order, a pill carrying side and quantity (<span class="badge b-tp">TP · 0,01 BTC</span>), and the exact price as a filled badge on the price scale</td>
       <td>Direct drag on the line</td>
     </tr>
     <tr>
       <td><b>Clustered</b></td>
       <td>Some gaps &lt; 24px</td>
-      <td>All lines drawn at 40% opacity, one chip per group (<span class="badge b-tp">4 TP · 55%</span>), a bracket showing the group's price extent</td>
-      <td>Tap chip, sheet lists the group, drag disabled until resolved</td>
+      <td>All lines drawn at 40% opacity, one pill per group (<span class="badge b-tp">4 TP · 0,02 BTC</span>), a bracket showing the group's price extent, no price badges</td>
+      <td>Tap pill, sheet lists the group with exact prices, drag disabled until resolved</td>
     </tr>
     <tr>
       <td><b>Collapsed</b></td>
-      <td>All orders of a side inside 24px</td>
-      <td>One blended line at the qty weighted average, one chip with the total, density rail keeps the full picture</td>
+      <td>All orders of a side inside 24px, <b>or</b> more groups than the lane can hold</td>
+      <td>One blended line at the qty weighted average, one pill per side with the side total, density rail keeps the full picture</td>
       <td>Sheet only, plus "zoom to separate"</td>
     </tr>
   </tbody>
 </table>
+<p>Two things moved out of the pill and each move earns something back. Quantity is now absolute (0,01 BTC) rather than a share of the position, and the price left the pill entirely for the price scale.</p>
+
+<div class="call">
+  <p><b>Absolute quantity survives a position change, a percentage does not</b></p>
+  <p class="sub">"20%" is a claim about the position, so it silently re-denominates the moment the trader adds to or partially closes that position: the same label now protects a different amount of BTC. An absolute quantity is a claim about the order itself and stays true. It also makes the number that actually matters computable, which is <b>coverage</b>: sum the side and compare it to the position, and an unprotected remainder becomes a fact you can state ("SL covers 0,03 of 0,05 BTC, 0,02 unprotected") instead of a subtraction the trader has to notice is missing from 100%. The sheet surfaces this and turns amber when a side does not fully cover.</p>
+</div>
+
+<div class="call">
+  <p><b>The price scale is already a price-to-pixel lane, so stop duplicating it</b></p>
+  <p class="sub">An IDR perp price is 13 characters (1.650.000.000). Inside a pill that forced a short form (1,650 M), which loses the last six digits exactly where tick precision matters. The price scale is sized for full prices by definition, and the existing position line already puts its price there as a filled badge. Reusing that lane removes the truncation, and shrinks the pill to side plus quantity, which buys back roughly 40% of its width in the most contested part of the plot.</p>
+</div>
 
 <h2>4. Prototype</h2>
 <p>Built on the current BTCIDR-PERP chart tab. The scenario is a long with 6 TP and 3 SL orders, which is a realistic scale out ladder and already enough to break a naive implementation.</p>
 <ul>
   <li><b>Drag the chart</b> to pan. Horizontally it scrolls through time and the order lines stay pinned. Vertically it changes which orders are on screen, so clusters re-form and edge chips update live.</li>
   <li><b>Drag the zoom slider</b> to move through all three tiers.</li>
-  <li><b>Tap a grouped chip</b> (<span class="badge b-tp">4 TP · 55%</span>) to open the sheet, then use Pisahkan to zoom until the group resolves.</li>
+  <li><b>Tap a grouped pill</b> (<span class="badge b-tp">4 TP · 0,02 BTC</span>) to open the sheet, which lists exact prices and the side's coverage of the position, then use Pisahkan to zoom until the group resolves.</li>
+  <li><b>Watch the price scale.</b> Resolved orders put a filled badge there at full precision and the tick label underneath is suppressed. Zoom in until an order badge has to yield to the liquidation or mark badge and its price falls back into the pill.</li>
   <li><b>Return to centre</b> with the "terkini" control that appears on the time axis once you have panned away.</li>
 </ul>
 
@@ -210,34 +230,47 @@
       <div class="legend">
         <div><i style="border-top:2px dashed var(--green)"></i>TP order line</div>
         <div><i style="border-top:2px dashed var(--red)"></i>SL order line</div>
-        <div><i style="border-top:2px solid var(--ink3)"></i>Entry price (anchor, never collapses)</div>
+        <div><i style="border-top:2px solid #1F6BFF"></i>Position line (anchor, never collapses)</div>
         <div><i style="border-top:2px solid var(--amber)"></i>Liquidation price (anchor, never collapses)</div>
-        <div><i style="border-top:2px solid var(--blue)"></i>Mark price</div>
+        <div><i style="border-top:2px dashed #3A4250"></i>Mark price</div>
+        <div><i style="border-top:2px solid #3A4250;opacity:.35"></i>Price scale badge, priority: liq &gt; mark &gt; position &gt; orders</div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="call warn">
-  <p><b>Read the chips, not the prices</b></p>
-  <p class="sub">A full IDR price does not fit a chip on a 390pt screen next to a 74pt axis, so chips carry the short form (1,646 M) plus qty share, and the sheet carries the exact price. This is the one place where the local number format changes the pattern rather than just the styling.</p>
+  <p><b>13 digit prices are why the price scale does the work</b></p>
+  <p class="sub">A full IDR perp price (1.650.000.000) does not fit a pill on a 390pt screen. Rather than truncate it to 1,650 M and lose the last six digits, the price moves to the price scale, which is already sized for exactly this string. The local number format still shapes the pattern here, it just pushes the price into a different lane instead of shortening it.</p>
 </div>
 
 <h2>5. Interaction rules</h2>
 
+<h3>Extending the existing position line, not inventing a label</h3>
+<p>The live position line already solves both halves of this: a segmented pill carrying the quantity in BTC and a running PnL, and the exact price as a filled badge on the price scale. Order labels inherit that anatomy rather than competing with it, so the only thing a trader has to learn is that green and red pills mean orders while blue means the position.</p>
+<p>The segment count stays fixed and only the trailing segment changes meaning, which is what makes the collapse legible. A resolved order reads side then quantity. A group reads count and side, then the summed quantity, then a chevron where the position line has its close action. Same shape, so the trader reads "there is more behind this" without a legend, and an action slot never turns into a disclosure slot in place.</p>
+
 <h3>Label lanes</h3>
-<p>Position anchors (mark, entry, liquidation) live in the left lane and never collapse, because they are what a trader reads position state from. Orders live in the right lane against the axis. Two lanes means the two categories can never collide, which removes most overlap before clustering runs.</p>
+<p>Position anchors (mark, position, liquidation) live in the left lane and never collapse, because they are what a trader reads position state from. Orders live in the right lane against the price scale. Two lanes means the two categories can never collide, which removes most overlap before clustering runs. The lane split is also forced by cardinality: there is exactly one position line in one way mode, so it can afford the left lane's generous three segment pill, while orders are unbounded and need the lane that clustering governs.</p>
+
+<h3>The price scale is a third lane, and it is contested</h3>
+<p>Moving price onto the scale moves the collision there too, so that lane needs its own rule. It is shared by the tick labels, the liquidation badge, the mark badge, the position badge and now the orders, and unlike a pill a badge <b>cannot be nudged</b>: its entire job is the y to price correspondence, so a badge shifted 20px to avoid an overlap is not offset, it is wrong.</p>
+<p>So the rule is priority and suppression, not displacement. Liquidation outranks mark, which outranks the position, which outranks orders; each badge claims a 15px band and a badge that cannot claim one is not drawn. Two consequences follow. Only <b>resolved</b> orders are eligible at all, because a cluster has no single price to put there. And a resolved order whose badge loses its band falls back to carrying the price as an extra pill segment, so the price degrades to a worse position rather than disappearing. In the sweep below, at most two order badges ever had to yield.</p>
+<p>Tick labels are the cheapest occupant and simply hide when a badge lands within 11px, since the badge states a price more precisely than the tick it covers.</p>
 
 <h3>Panning</h3>
 <p>The two axes are not symmetrical, and treating them the same is the mistake to avoid. Horizontal panning is pure time travel: order lines are price anchored, span the full width and must not move, so the overlay needs no recalculation at all. Vertical panning is the expensive one, because it changes the price to pixel mapping, which changes cluster membership, which changes what is on screen. Every off screen order becomes an edge chip the moment it leaves the viewport, which is what makes vertical panning feel safe rather than lossy.</p>
 <p>Two consequences for the build. First, panning must never grab an order: the chart owns the whole surface, chips own their own hit area, and picking up a line requires a long press. Second, once the trader has panned away from mark price they need one tap back, so a return control appears on the time axis. In production that should follow chart convention and split into two, auto scale on the price axis and scroll to latest on the time axis, rather than one combined reset.</p>
 <p>Panning also promotes the density rail from a nice to have into load bearing UI. With a fixed price domain and a viewport window drawn on it, the rail becomes a vertical scroll indicator: it shows where you are in the ladder, how much of it is above or below the fold, and that nothing has been dropped. It is what lets you pan aggressively without losing the plot.</p>
 
-<h3>Chip de-overlap</h3>
-<p>Clustering alone is not sufficient, and testing the logic proved it. TP and SL must never merge into one chip because the merge would be semantically wrong, so a TP cluster sitting just above price and an SL cluster just below can still collide. The fix is a second pass: lines stay at their true price, chips get pushed apart to the 24px minimum, and a short leader line owns the difference. Twenty orders inside a 0,5% band produced two colliding chips before this pass and zero after it.</p>
+<h3>Pill de-overlap</h3>
+<p>Clustering alone is not sufficient, and testing the logic proved it. TP and SL must never merge into one pill because the merge would be semantically wrong, so a TP cluster sitting just above price and an SL cluster just below can still collide. The fix is two bounded passes: lines stay at their true price, pills get pushed apart to the 24px minimum and clamped inside the lane, and a short leader line owns the difference. Unlike a price badge a pill can be nudged, because its meaning is "this group" rather than "this exact y".</p>
+
+<h3>Lane capacity is a second collapse trigger</h3>
+<p>Proximity clustering has a blind spot worth stating, because it only merges <b>adjacent same side</b> orders. Sides that interleave never merge, so a tight band of alternating TP and SL can produce more pills than the lane physically holds, and the de-overlap pass then has to space them below one chip height, which means they overlap after all. The lane holds 11 pills at 24px, so exceeding that count overrules proximity and collapses each side to one pill. Sixty orders inside a 0,05% band now produce two pills with every quantity still accounted for, where the proximity rule alone produced sixty.</p>
 
 <h3>Weight encoding</h3>
-<p>Line opacity and thickness scale with qty share, so a 40% TP reads heavier than a 5% one. This answers "which of these matters" at exactly the moment labels are unavailable.</p>
+<p>Line opacity and thickness scale with the order's share of the position, so a 0,02 BTC SL reads heavier than a 0,005 BTC one. This answers "which of these matters" at exactly the moment labels are unavailable. Note that the encoding stays proportional even though the label is now absolute: thickness is comparative by nature, and comparison is the one thing a percentage was genuinely good at.</p>
 
 <h3>Drag safety</h3>
 <ul>
@@ -248,7 +281,8 @@
 </ul>
 
 <h3>Off screen orders</h3>
-<p>Edge chips (<span class="badge b-sl">&darr; 2 SL · 70%</span>) plus the density rail keep the whole ladder accounted for when the viewport only holds part of it. One chip <b>per side per edge</b>, never one merged chip: pan far enough and both TP and SL can end up above the fold at once, and a single chip would have to lie about the side. Testing the pan states confirmed all 9 orders stay accounted for at every zoom and pan position, which is the invariant the whole pattern rests on.</p>
+<p>Edge chips (<span class="badge b-sl">&darr; 2 SL · 0,03 BTC</span>) plus the density rail keep the whole ladder accounted for when the viewport only holds part of it. One chip <b>per side per edge</b>, never one merged chip: pan far enough and both TP and SL can end up above the fold at once, and a single chip would have to lie about the side. Absolute quantities make these chips additive with the on screen pills, so the totals reconcile by inspection, which is the arithmetic a percentage share quietly prevented.</p>
+<p>The invariant the whole pattern rests on was checked rather than eyeballed: across 2.673 combinations of zoom range and vertical pan position, every quantity is accounted for in exactly one pill or edge chip, no two pills sit closer than 24px, no two price badges share a 15px band, and no pill escapes the lane.</p>
 
 <h2>6. Pseudocode</h2>
 <p>Language agnostic, and deliberately independent of the charting library. The only thing it needs from the chart is a price to y mapping and a redraw signal, which keeps it testable in isolation and portable if the chart layer changes.</p>
@@ -283,33 +317,62 @@
       <span class="kw">ELSE</span>
           clusters.push(newCluster(v))
 
-<span class="kw">STEP 4: RENDER</span>
+<span class="kw">STEP 3B: CAPACITY OVERRIDE</span>   <span class="c">// proximity only merges ADJACENT SAME SIDE orders, so</span>
+                              <span class="c">// interleaved sides can outrun the lane. LANE_CAP = 11</span>
+  LANE_CAP = floor((H - 2*LANE_INSET) / THRESHOLD_PX) + 1
+  <span class="kw">IF</span> clusters.length &gt; LANE_CAP:
+      clusters = [ oneClusterPerSide(visible) ]                     <span class="c">// straight to collapsed</span>
+
+<span class="kw">STEP 4: RENDER LINES AND QUEUE LABELS</span>
+  badges = []                                <span class="c">// price scale lane, priority ordered</span>
+  badges.push({ y: yOf(liq),  prio: 0 })     <span class="c">// liquidation outranks everything</span>
+  badges.push({ y: yOf(mark), prio: 1 })
+  badges.push({ y: yOf(entry), prio: 2 })    <span class="c">// the existing position line badge</span>
+
   <span class="kw">FOR</span> c <span class="kw">IN</span> clusters:
       <span class="kw">FOR</span> v <span class="kw">IN</span> c.items:                                    <span class="c">// always draw every line</span>
           drawLine(y       = v.y,
                    color   = c.side == TP ? green : red,
                    opacity = c.size &gt; 1 ? 0.4 : 1.0,
-                   weight  = lerp(1, 2.5, v.order.qtyShare))       <span class="c">// weight = conviction</span>
+                   weight  = lerp(1, 3, v.order.qty / positionQty))  <span class="c">// weight = conviction</span>
       <span class="kw">IF</span> c.size == 1:
-          chips.push({ y: c.items[0].y, text: <span class="st">"TP 1,646 M · 10%"</span>, draggable: <span class="kw">true</span> })
+          <span class="c">// pill = [side][qty]. price goes on the scale, NOT in the pill.</span>
+          pill = { y: c.items[0].y, segs: [c.side, fmtQty(c.qty)], draggable: <span class="kw">true</span> }
+          pill.badge = { y: c.items[0].y, prio: 3, price: c.items[0].order.price }
+          badges.push(pill.badge)            <span class="c">// eligible only because it is resolved</span>
       <span class="kw">ELSE</span>:
           drawBracket(c.firstY, c.lastY)                            <span class="c">// group extent</span>
-          chips.push({ y: c.midY, tappable: <span class="kw">true</span>,
-                       text: c.size + <span class="st">" "</span> + c.side + <span class="st">" · "</span> + c.totalQtyShare + <span class="st">"%"</span> })
+          <span class="c">// same 3 segment shape as the position line, trailing slot becomes disclosure</span>
+          pill = { y: c.midY, tappable: <span class="kw">true</span>,
+                   segs: [c.size + <span class="st">" "</span> + c.side, fmtQty(c.totalQty), <span class="st">"›"</span>] }
+      pills.push(pill)
 
-<span class="kw">STEP 4B: CHIP DE-OVERLAP</span>   <span class="c">// TP and SL must never merge into one chip, so two</span>
-                             <span class="c">// adjacent clusters of opposite sides can still collide</span>
-  sort chips by y
-  forward pass:   ch.cy = max(ch.y, previous.cy + THRESHOLD_PX)
-  backward pass:  clamp ch.cy inside [top+12, bottom-12] and re-push upward
-                  so the forward pass cannot overflow the pane
-  <span class="kw">FOR</span> ch <span class="kw">IN</span> chips:
-      <span class="kw">IF</span> abs(ch.cy - ch.y) &gt; 3:
-          drawLeaderLine(ch.y, ch.cy)        <span class="c">// the line stays true, only the label moves</span>
-      drawChip(ch.cy, ch.text)
+<span class="kw">STEP 4B: PRICE SCALE LANE</span>   <span class="c">// a badge CANNOT be nudged: its whole job is the y to</span>
+                            <span class="c">// price correspondence, so it is drawn or it is not drawn</span>
+  sort badges by (prio, y)
+  claimed = []
+  <span class="kw">FOR</span> b <span class="kw">IN</span> badges:
+      <span class="kw">IF</span> b.y inside lane <span class="kw">AND</span> no c <span class="kw">IN</span> claimed <span class="kw">WHERE</span> abs(c - b.y) &lt; BAND_PX:
+          claimed.push(b.y); b.drawn = <span class="kw">true</span>
+  drawTickLabels(skipping any within 11px of a drawn badge)         <span class="c">// badge wins</span>
+  <span class="kw">FOR</span> b <span class="kw">IN</span> badges <span class="kw">WHERE</span> b.drawn: drawFilledBadge(b.y, fmtPrice(b.price))
 
-  drawAnchors(mark, entry, liquidation)      <span class="c">// left lane, exempt from clustering</span>
-  <span class="kw">IF</span> offAbove: drawEdgeChip(TOP, offAbove)
+<span class="kw">STEP 4C: PILL DE-OVERLAP</span>   <span class="c">// unlike a badge, a pill MAY move: it means "this group",</span>
+                            <span class="c">// not "this exact y". TP and SL never merge, so they collide</span>
+  sort pills by y
+  forward pass:   p.cy = max(p.y, previous.cy + THRESHOLD_PX)       <span class="c">// enforces top edge</span>
+  backward pass:  p.cy = min(p.cy, next.cy - THRESHOLD_PX)          <span class="c">// enforces bottom edge</span>
+  <span class="kw">IF</span> pills[0].cy &lt; laneTop:                                        <span class="c">// cannot fit at all</span>
+      spread evenly across the lane                                <span class="c">// degrade uniformly, never overlap</span>
+  <span class="kw">FOR</span> p <span class="kw">IN</span> pills:
+      <span class="kw">IF</span> abs(p.cy - p.y) &gt; 3:
+          drawLeaderLine(p.y, p.cy)          <span class="c">// the line stays true, only the label moves</span>
+      <span class="kw">IF</span> p.badge <span class="kw">AND NOT</span> p.badge.drawn:
+          p.segs.insert(fmtPrice(p.badge.price))   <span class="c">// fallback, price never vanishes</span>
+      drawPill(p.cy, p.segs)
+
+  drawAnchorPills(mark, position, liquidation)  <span class="c">// left lane, exempt from clustering</span>
+  <span class="kw">IF</span> offAbove: drawEdgeChip(TOP, offAbove)      <span class="c">// one per side per edge, qty in BTC</span>
   <span class="kw">IF</span> offBelow: drawEdgeChip(BOTTOM, offBelow)
   drawDensityRail(orders, fixedDomain, viewportWindow)
 
@@ -337,7 +400,13 @@
      and a leader line owns the difference
   8. horizontal pan invalidates nothing: lines are price anchored and span
      the full width. only vertical pan, pinch and zoom invalidate the layout,
-     so gate the whole redraw on a change in { from, to, H }</pre>
+     so gate the whole redraw on a change in { from, to, H }
+  9. quantity is absolute, never a share of the position, so a label cannot
+     be silently re-denominated by an add or a partial close
+ 10. a price badge is drawn at its true y or not drawn at all. a pill may be
+     nudged. never the reverse
+ 11. the price scale badge must be fully opaque, because over a real
+     TradingView scale we cannot hide the library's own tick labels</pre>
 
 <h2>7. TradingView Advanced Charts: what is and is not available</h2>
 <p>This is the part to validate with engineering before committing to the pattern. Verified against the current Advanced Charts docs.</p>
@@ -358,22 +427,27 @@
       <td><span class="k">createShape({price},{shape:'horizontal_line'})</span> with <span class="k">lock</span>, <span class="k">disableSelection</span>, <span class="k">disableSave</span>, <span class="k">disableUndo</span>, <span class="k">zOrder</span>. Fine for static lines, but shapes are drawings: they cannot carry our chip UI or clustering, and cost per shape is undocumented. Use for lines only, or not at all.</td></tr>
     <tr><td>Overlay host</td><td><span class="badge b-chk">Constraint</span></td>
       <td>The library renders inside an iframe, so our layer is a sibling absolutely positioned over it. It needs <span class="k">pointer-events:none</span> on the container and <span class="k">auto</span> only on chips and handles, otherwise we swallow pan and zoom.</td></tr>
+    <tr><td>Price scale badges</td><td><span class="badge b-chk">Constraint</span></td>
+      <td>We cannot render <i>into</i> the price scale, because it lives inside the iframe. Our badge is drawn on top of it, which has two consequences. It must be <b>fully opaque</b>, since we cannot selectively hide the library's own tick labels and can only occlude them. And we cannot query the scale's width, so the badge is positioned from the right edge against a configured constant. Worth confirming with engineering that the IDR scale width is stable, since a scale that auto widens when digit count changes would shift our badges. IDR perp prices are a constant 13 characters in the tradeable range, so this is likely safe but should be asserted rather than assumed.</td></tr>
   </tbody>
 </table>
 
 <div class="call warn">
   <p><b>The honest summary for PM</b></p>
-  <p class="sub">The pattern is buildable on Advanced Charts, but nothing about order lines comes for free. We own the overlay, the coordinate math, the drag behaviour and the redraw loop. The upside of owning it is that clustering, IDR label shortening and cluster sheets are all impossible with native order lines anyway, so we would be writing this layer even on Trading Platform. Recommend a one week spike on the redraw loop and vertical pinch before we commit to the interaction.</p>
+  <p class="sub">The pattern is buildable on Advanced Charts, but nothing about order lines comes for free. We own the overlay, the coordinate math, the drag behaviour and the redraw loop. The upside of owning it is that clustering, the price scale badge lane and cluster sheets are all impossible with native order lines anyway, so we would be writing this layer even on Trading Platform. One point in our favour: because the position line already ships this exact anatomy, the pill and badge components exist and this is an extension rather than a new pattern. Recommend a one week spike on the redraw loop and vertical pinch before we commit to the interaction.</p>
 </div>
 
 <h2>8. Edge cases to design for</h2>
 <ul>
   <li><b>Partial fill mid cluster.</b> The chip count changing under the trader's finger is the ugliest case here. Animate the count, keep the sheet open, never reorder rows while a row is being touched.</li>
   <li><b>Price crossing the ladder.</b> With price moving through a tight cluster every tick, labels must not reflow on each frame. Recompute clusters on range change, not on price tick, and let the mark line move freely through them.</li>
-  <li><b>Low volatility pair, tight range.</b> Worst case is many orders inside a narrow band, not many orders overall. Test with 20 orders inside 0,5%.</li>
-  <li><b>One order.</b> The pattern must not look like a system at n=1. A single TP shows one plain line and one label, no bracket, no chip affordance.</li>
-  <li><b>Log or percent scale.</b> Chips hide and the sheet becomes the source of truth until the mapping is implemented.</li>
+  <li><b>Low volatility pair, tight range.</b> Worst case is many orders inside a narrow band, not many orders overall. Test with 20 orders inside 0,5%, and with sides interleaved rather than separated, which is the case that exposes the lane capacity limit.</li>
+  <li><b>One order.</b> The pattern must not look like a system at n=1. A single TP shows one plain line, one pill and one price badge, no bracket, no disclosure affordance.</li>
+  <li><b>Log or percent scale.</b> Pills and badges hide and the sheet becomes the source of truth until the mapping is implemented.</li>
   <li><b>Order rejected or cancelled server side.</b> The line must disappear with a reason, not just vanish from the overlay.</li>
+  <li><b>Order quantity below display precision.</b> A 0,0001 BTC order rounds to 0 at three decimals, so the pill would read "0 BTC" and look like a bug. Either raise precision for small quantities or show a "&lt;0,001" form, and decide which before the first altcoin perp with a much smaller tick.</li>
+  <li><b>Orders that do not cover the position.</b> Absolute quantities make an unprotected remainder visible, which is new information the percentage view hid. Decide whether that is a passive readout in the sheet or an active warning on the chart, because it is arguably the most valuable thing this change surfaces.</li>
+  <li><b>Liquidation price inside a cluster.</b> The liquidation badge outranks order badges on the scale, so a stop sitting within 15px of liquidation loses its badge and shows the price in its pill instead. Verify with engineering that this is the priority traders expect, since the alternative reading is that a stop near liquidation is the single most important price on the screen.</li>
 </ul>
 
 <h2>9. Open questions</h2>
@@ -382,6 +456,9 @@
   <li>Should the density rail be persistent or only appear while a cluster exists?</li>
   <li>Is 24px the right threshold on our type scale, or should it be derived from the chip height token so it survives a typography change?</li>
   <li>Does the trading team want cluster level actions (cancel all TP in this group) or is per order enough for v1?</li>
+  <li>Should a resolved order pill carry PnL as a third segment, the way the position line does? It is the strongest argument for the shared anatomy, but it is also the widest thing we could put in the most contested lane. Leaning no for v1.</li>
+  <li>Does the position line's inline close action have an analogue on order pills? Cancelling a stop by tapping the chart removes protection, which is a worse failure than closing a position by mistake, so v1 keeps cancel in the sheet only. Confirm with the trading team.</li>
+  <li>Should quantity be shown in BTC or in the quote currency? BTC matches the position line and is unit stable, but a trader sizing in rupiah may reason in IDR. A toggle is the obvious answer and the obvious way to add a setting nobody uses.</li>
 </ul>
 
 <footer>Draft one pager · prototype and logic are illustrative, numbers are mock data. TradingView API notes verified against the current Advanced Charts documentation and should be re-checked against our pinned library version.</footer>
@@ -390,23 +467,26 @@
 <script>
 (function(){
   var CH = 282, PW = 312, THRESH = 24, PAD = 6, BS = 5, NB = 170;
-  var MARK = 1628000000, ENTRY = 1512000000, LIQ = 1451000000;
+  var BAND = 15, AXW = 74;
+  var POSU = 50;
+  var MARK = 1628000000, ENTRY = 1600000000, LIQ = 1451000000;
   var RTOP = 1780000000, RBOT = 1420000000;
   var HOME = (NB-1)*BS - PW + 14;
   var scrollX = HOME, centerP = MARK, panning = false;
   var GREEN = "#22AB63", GREENBG = "#E7F6ED", GREENTX = "#12693D";
   var RED = "#EA5350", REDBG = "#FDECEB", REDTX = "#9E2B28";
 
+  // qty is stored in integer milli-BTC so sums never drift. POSU (50) is the whole position.
   var orders = [
-    { id:"tp1", side:"TP", price:1635000000, qty:20 },
-    { id:"tp2", side:"TP", price:1642000000, qty:15 },
-    { id:"tp3", side:"TP", price:1646000000, qty:10 },
+    { id:"tp1", side:"TP", price:1635000000, qty:10 },
+    { id:"tp2", side:"TP", price:1642000000, qty:5 },
+    { id:"tp3", side:"TP", price:1646000000, qty:5 },
     { id:"tp4", side:"TP", price:1650000000, qty:10 },
-    { id:"tp5", side:"TP", price:1678000000, qty:25 },
-    { id:"tp6", side:"TP", price:1720000000, qty:20 },
-    { id:"sl1", side:"SL", price:1598000000, qty:30 },
-    { id:"sl2", side:"SL", price:1592000000, qty:30 },
-    { id:"sl3", side:"SL", price:1560000000, qty:40 }
+    { id:"tp5", side:"TP", price:1678000000, qty:10 },
+    { id:"tp6", side:"TP", price:1720000000, qty:10 },
+    { id:"sl1", side:"SL", price:1598000000, qty:15 },
+    { id:"sl2", side:"SL", price:1592000000, qty:15 },
+    { id:"sl3", side:"SL", price:1560000000, qty:20 }
   ];
 
   var sd = 7;
@@ -422,8 +502,11 @@
   function hhmm(m){ m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0"); }
 
   function F(v){ return Math.round(v).toLocaleString("id-ID"); }
-  function S(v){ return (v/1e9).toLocaleString("id-ID",{minimumFractionDigits:3,maximumFractionDigits:3}) + " M"; }
   function pct(v){ return ((v-MARK)/MARK*100).toFixed(2).replace(".",",") + "%"; }
+  // qty: integer milli-BTC in, trimmed decimal BTC out. 10 -> "0,01 BTC", 5 -> "0,005 BTC"
+  function Q(u){ return (u/1000).toLocaleString("id-ID",{minimumFractionDigits:0,maximumFractionDigits:3}) + " BTC"; }
+  function R(v){ return (v < 0 ? "-Rp" : "+Rp") + Math.abs(Math.round(v)).toLocaleString("id-ID"); }
+  function pnl(price, u){ return (price - ENTRY) * (u/1000); }
 
   var phone = document.getElementById("phone");
   phone.innerHTML =
@@ -447,6 +530,8 @@
 
   function render(){
     var range = +zoom.value * 1000000;
+    // the label lane is finite. CAP is how many chips physically fit at one chip height apart.
+    var LO = 12, HI = CH - 12, CAP = Math.floor((HI - LO) / THRESH) + 1;
     centerP = Math.max(RBOT + range/2, Math.min(RTOP - range/2, centerP));
     scrollX = Math.max(0, Math.min(HOME + 60, scrollX));
     var top = centerP + range/2, bot = centerP - range/2;
@@ -469,15 +554,30 @@
       plot += '<div style="position:absolute;left:'+x+'px;top:'+y(Math.max(k.o,k.c))+'px;width:3px;height:'+Math.max(1,Math.abs(k.c-k.o)*ppu)+'px;background:'+col+'"></div>';
     }
 
-    [{l:"Mark",p:MARK,c:"#1F6BFF",b:"#EAF1FF",t:"#0B3EA8"},
-     {l:"Entry",p:ENTRY,c:"#8A93A0",b:"#F2F4F7",t:"#3A4250"},
-     {l:"Liq",p:LIQ,c:"#C6820A",b:"#FCF3E0",t:"#7A5106"}].forEach(function(a){
+    // badges queued for the price scale. priority order: liq, mark, position, then resolved orders.
+    var badges = [];
+
+    [{l:"Liq",p:LIQ,c:"#C6820A",t:"#7A5106",prio:0},
+     {l:"Mark",p:MARK,c:"#3A4250",t:"#3A4250",prio:1,dash:true},
+     {l:"Posisi",p:ENTRY,c:"#1F6BFF",t:"#0B3EA8",prio:2,pos:true}].forEach(function(a){
       var ay = y(a.p);
       if (ay < -4 || ay > CH + 4) return;
-      plot += '<div class="oline" style="top:'+ay+'px;border-top-color:'+a.c+';'+(a.l==="Mark"?"":"border-top-style:solid")+'"></div>';
-      plot += '<div style="position:absolute;left:4px;top:'+ay+'px;transform:translateY(-50%);background:'+a.b+';color:'+a.t
-           +';font-family:var(--mono);font-size:9.5px;font-weight:600;padding:1px 4px;border-radius:4px;white-space:nowrap">'
-           + a.l + " " + S(a.p) + '</div>';
+      plot += '<div class="oline" style="top:'+ay+'px;border-top-color:'+a.c
+           + (a.dash ? ";border-top-style:dashed" : "") + '"></div>';
+      var segs;
+      if (a.pos){
+        // same three-segment anatomy as the live position line: qty, running pnl, close
+        segs = '<i>'+Q(POSU)+'</i><i style="border-color:'+a.c+';color:'
+             + (pnl(MARK,POSU) < 0 ? REDTX : GREENTX) + '">'+R(pnl(MARK,POSU))+'</i>'
+             + '<i style="border-color:'+a.c+';color:'+a.c+'">&times;</i>';
+        plot += '<div style="position:absolute;left:2px;top:'+ay+'px;width:7px;height:7px;border-radius:50%;'
+             + 'background:'+a.c+';transform:translate(-50%,-50%);margin-left:4px"></div>';
+      } else {
+        segs = '<i>'+a.l+'</i>';
+      }
+      plot += '<div class="chip" style="left:'+(a.pos?12:4)+'px;right:auto;top:'+ay+'px;border-color:'+a.c
+           + ';color:'+a.t+';cursor:default">'+segs+'</div>';
+      badges.push({ y:ay, c:a.c, p:a.p, prio:a.prio });
     });
 
     var vis = [], offN = 0;
@@ -498,6 +598,16 @@
       else clusters.push({ side:v.o.side, items:[v] });
     });
 
+    // second collapse trigger: proximity can leave more chips than the lane can hold, for
+    // example alternating sides in a tight band. capacity overflow forces one chip per side.
+    var forced = clusters.length > CAP;
+    if (forced){
+      var byside = { TP:[], SL:[] };
+      vis.forEach(function(v){ byside[v.o.side].push(v); });
+      clusters = [];
+      ["TP","SL"].forEach(function(s){ if (byside[s].length) clusters.push({ side:s, items:byside[s] }); });
+    }
+
     var chips = [];
     clusters.forEach(function(c, ci){
       var isTP = c.side === "TP";
@@ -507,44 +617,73 @@
       c.items.forEach(function(v){ qty += v.o.qty; });
       c.items.forEach(function(v){
         plot += '<div class="oline" style="top:'+v.y+'px;border-top-color:'+col
-             +';border-top-style:dashed;border-top-width:'+(1 + v.o.qty/40).toFixed(2)+'px;opacity:'+(many?.4:1)+'"></div>';
+             +';border-top-style:dashed;border-top-width:'+(1 + (v.o.qty/POSU)*2).toFixed(2)+'px;opacity:'+(many?.4:1)+'"></div>';
       });
       var my = c.items.reduce(function(a,v){ return a+v.y; },0) / c.items.length;
       if (many){
         var y0 = c.items[0].y, y1 = c.items[c.items.length-1].y;
         plot += '<div style="position:absolute;right:98px;top:'+y0+'px;height:'+(y1-y0)+'px;width:5px;border:1px solid '+col+';border-left:none;opacity:.7"></div>';
       }
-      chips.push({
+      var ch = {
         ci: ci, y: my, many: many, bg: bg, tx: tx, col: col,
-        label: many ? (c.items.length + " " + c.side + " &middot; " + qty + "%")
-                    : (c.side + " " + S(c.items[0].o.price) + " &middot; " + qty + "%")
-      });
+        head: many ? (c.items.length + " " + c.side) : c.side,
+        qty: Q(qty),
+        badge: null
+      };
+      // only a resolved line earns a price scale badge. a badge nudged off its own
+      // line would be a lie, because its whole job is the y to price correspondence.
+      if (!many){
+        ch.badge = { y: c.items[0].y, c: col, p: c.items[0].o.price, prio: 3 };
+        badges.push(ch.badge);
+      }
+      chips.push(ch);
     });
 
+    var taken = [];
+    badges.sort(function(a,b){ return a.prio - b.prio || a.y - b.y; });
+    badges.forEach(function(b){
+      var ok = b.y >= 8 && b.y <= CH - 8;
+      for (var i = 0; i < taken.length && ok; i++) if (Math.abs(taken[i] - b.y) < BAND) ok = false;
+      if (ok){ taken.push(b.y); b.drawn = true; }
+    });
+
+    // two bounded passes. forward enforces spacing and the top edge, backward enforces the
+    // bottom edge by pushing back up. if the top chip ends up above the lane the stack cannot
+    // fit, so spacing degrades uniformly rather than letting any two chips overlap.
     chips.sort(function(a,b){ return a.y - b.y; });
-    var prev = -1e9;
+    var prev = LO - THRESH;
     chips.forEach(function(ch){ ch.cy = Math.max(ch.y, prev + THRESH); prev = ch.cy; });
+    var next = HI + THRESH;
     for (var j = chips.length - 1; j >= 0; j--){
-      if (chips[j].cy > CH - 12) chips[j].cy = CH - 12;
-      if (j > 0 && chips[j].cy - chips[j-1].cy < THRESH) chips[j-1].cy = chips[j].cy - THRESH;
+      chips[j].cy = Math.min(chips[j].cy, next - THRESH);
+      next = chips[j].cy;
+    }
+    if (chips.length && chips[0].cy < LO){
+      var gap = Math.min(THRESH, (HI - LO) / Math.max(1, chips.length - 1));
+      chips.forEach(function(ch, i){ ch.cy = LO + i * gap; });
     }
     chips.forEach(function(ch){
-      if (ch.cy < 12) ch.cy = 12;
       if (Math.abs(ch.cy - ch.y) > 3){
         plot += '<div style="position:absolute;right:14px;top:'+Math.min(ch.y,ch.cy)+'px;height:'+Math.abs(ch.cy-ch.y)
              +'px;width:1px;background:'+ch.col+';opacity:.5"></div>';
       }
-      plot += '<div class="chip" data-c="'+ch.ci+'" style="top:'+ch.cy+'px;background:'+ch.bg+';color:'+ch.tx+';border-color:'+ch.col+'">'
-           + ch.label + (ch.many ? " &rsaquo;" : "") + '</div>';
+      // price normally lives on the scale. if this badge lost its slot, the chip carries it instead.
+      var fallback = ch.badge && !ch.badge.drawn
+        ? '<i style="border-color:'+ch.col+';font-weight:500">'+F(ch.badge.p)+'</i>' : '';
+      plot += '<div class="chip" data-c="'+ch.ci+'" style="top:'+ch.cy+'px;color:'+ch.tx+';border-color:'+ch.col+'">'
+           + '<i style="background:'+ch.bg+'">'+ch.head+'</i>'
+           + '<i style="border-color:'+ch.col+'">'+ch.qty+'</i>' + fallback
+           + (ch.many ? '<i style="border-color:'+ch.col+';color:'+ch.col+'">&rsaquo;</i>' : '')
+           + '</div>';
     });
 
     var uk = 0, dk = 0;
     ["TP","SL"].forEach(function(s){
       var tx = s === "TP" ? GREENTX : REDTX;
       var a = off.up[s];
-      if (a.n){ plot += '<div class="edge" style="top:'+(PAD + uk*17)+'px;color:'+tx+'">&uarr; '+a.n+" "+s+" &middot; "+a.q+'%</div>'; uk++; }
+      if (a.n){ plot += '<div class="edge" style="top:'+(PAD + uk*17)+'px;color:'+tx+'">&uarr; '+a.n+" "+s+" &middot; "+Q(a.q)+'</div>'; uk++; }
       var b = off.dn[s];
-      if (b.n){ plot += '<div class="edge" style="bottom:'+(PAD + dk*17)+'px;color:'+tx+'">&darr; '+b.n+" "+s+" &middot; "+b.q+'%</div>'; dk++; }
+      if (b.n){ plot += '<div class="edge" style="bottom:'+(PAD + dk*17)+'px;color:'+tx+'">&darr; '+b.n+" "+s+" &middot; "+Q(b.q)+'</div>'; dk++; }
     });
 
     var rail = '<div style="position:absolute;left:0;right:0;top:'+((RTOP-top)/(RTOP-RBOT)*CH)+'px;height:'
@@ -556,10 +695,15 @@
 
     var steps = [10e6,25e6,50e6,100e6,200e6], st = steps[steps.length-1];
     for (var s = 0; s < steps.length; s++){ if (range/steps[s] <= 6){ st = steps[s]; break; } }
-    var axis = "";
+    var axis = "", shown = badges.filter(function(b){ return b.drawn; });
     for (var t = Math.ceil(bot/st)*st; t <= top; t += st){
-      axis += '<div style="top:'+y(t)+'px">'+F(t)+'</div>';
+      var ty = y(t), hit = false;
+      for (var bi = 0; bi < shown.length; bi++) if (Math.abs(shown[bi].y - ty) < 11) { hit = true; break; }
+      if (!hit) axis += '<div class="tick" style="top:'+ty+'px">'+F(t)+'</div>';
     }
+    shown.forEach(function(b){
+      axis += '<div class="pbadge" style="top:'+b.y+'px;background:'+b.c+'">'+F(b.p)+'</div>';
+    });
 
     var taxis = "";
     for (var b = i0; b <= i1; b++){
@@ -580,7 +724,8 @@
     var tpc = clusters.filter(function(c){ return c.side==="TP"; }).length;
     var slc = clusters.filter(function(c){ return c.side==="SL"; }).length;
     var name, why;
-    if (maxc <= 1){ name = "Tier 1: resolved"; why = "every gap is 24px or more, so each order gets its own label and can be dragged directly."; }
+    if (forced){ name = "Tier 3: collapsed, by lane capacity"; why = "more chips than the " + CAP + " the lane can hold, so proximity is overruled and each side becomes one chip."; }
+    else if (maxc <= 1){ name = "Tier 1: resolved"; why = "every gap is 24px or more, so each order gets its own label, its own price badge on the scale, and can be dragged directly."; }
     else if (tpc <= 1 && slc <= 1 && vis.length > 2 && offN === 0){ name = "Tier 3: collapsed"; why = "each side is one chip. the density rail is now the only proof that nothing was dropped."; }
     else { name = "Tier 2: clustered"; why = "some groups are merged. every line is still drawn at 40% opacity so the shape of the ladder survives."; }
     document.getElementById("tiername").textContent = name;
@@ -609,19 +754,25 @@
       return;
     }
     var isTP = c.side === "TP", bg = isTP ? GREENBG : REDBG, tx = isTP ? GREENTX : REDTX;
+    var gq = c.items.reduce(function(a,v){ return a+v.o.qty; },0);
+    var sq = orders.reduce(function(a,o){ return a + (o.side === c.side ? o.qty : 0); },0);
     var rows = c.items.map(function(v){
       return '<div class="row"><span class="badge '+(isTP?"b-tp":"b-sl")+'">'+v.o.side+'</span>'
         + '<span class="p">'+F(v.o.price)+'</span>'
-        + '<span class="q">'+v.o.qty+'%</span>'
+        + '<span class="q">'+Q(v.o.qty)+'</span>'
         + '<span class="q" style="width:52px;text-align:right">'+pct(v.o.price)+'</span>'
         + '<button class="mini">Ubah</button></div>';
     }).join("");
     bottom.innerHTML = '<div class="sheet"><div style="width:34px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 10px"></div>'
       + '<div class="hd"><b>'+c.items.length+" order "+c.side+' di grup ini</b>'
       + '<span><button class="mini" id="zf">Pisahkan</button> <button class="mini" id="cx">Tutup</button></span></div>'
-      + '<div style="font-size:11.5px;color:var(--ink3);margin-bottom:2px">Total '
-      + c.items.reduce(function(a,v){ return a+v.o.qty; },0) + '% dari posisi &middot; rata-rata '
-      + S(c.items.reduce(function(a,v){ return a+v.o.price*v.o.qty; },0)/c.items.reduce(function(a,v){ return a+v.o.qty; },0))
+      + '<div style="font-size:11.5px;color:var(--ink3);margin-bottom:2px">Grup ini '
+      + Q(gq) + ' &middot; rata-rata '
+      + F(c.items.reduce(function(a,v){ return a+v.o.price*v.o.qty; },0)/gq)
+      + '</div>'
+      + '<div style="font-size:11.5px;color:'+(sq < POSU ? "var(--amber)" : "var(--ink3)")+';margin-bottom:8px">'
+      + c.side + ' menutup ' + Q(sq) + ' dari ' + Q(POSU) + ' posisi'
+      + (sq < POSU ? ' &middot; ' + Q(POSU - sq) + ' belum terlindungi' : '')
       + '</div>' + rows + '</div>';
     document.getElementById("cx").onclick = function(){ openIdx = null; drawBottom(); };
     document.getElementById("zf").onclick = function(){
