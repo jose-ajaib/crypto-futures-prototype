@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ubah Leverage — Prototype</title>
+<style>
+  :root{
+    --purple:#5B0FE0;
+    --track:#D7E9F7;
+    --blue:#3E7BFA;
+    --green:#12A150;
+    --amber:#C08A00;
+    --ink:#141518;
+    --gray:#6B7280;
+    --chip:#F1F2F4;
+    --panel:#F4F5F6;
+    --border:#E3E5E8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    background:#EDEEF0;
+    font-family:"Lato","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    padding:24px 16px 48px;
+    min-height:100vh;
+  }
+
+  /* ---------- device ---------- */
+  .phone{
+    width:390px;
+    height:780px;
+    border-radius:28px;
+    overflow:hidden;
+    position:relative;
+    background:#7C7F86;
+    box-shadow:0 12px 40px rgba(0,0,0,.18);
+  }
+  .backdrop{
+    position:absolute;inset:0;
+    background:#7C7F86;
+  }
+
+  /* ---------- bottom sheet: FIXED HEIGHT ---------- */
+  .sheet{
+    position:absolute;
+    left:0;right:0;bottom:0;
+    height:552px;              /* fixed — never changes with warning state */
+    background:#fff;
+    border-radius:20px 20px 0 0;
+    padding:24px 20px 20px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;}
+  .title{font-size:22px;font-weight:800;letter-spacing:-.2px;margin:0;}
+  .close{
+    background:none;border:0;padding:4px;margin:-4px -4px 0 0;
+    cursor:pointer;color:var(--ink);line-height:0;
+  }
+  .subtitle{
+    margin:6px 0 0;font-size:13.5px;line-height:1.45;color:var(--gray);
+    max-width:330px;
+  }
+
+  /* ---------- pair ---------- */
+  .pair{text-align:center;margin-top:22px;}
+  .coin{
+    width:44px;height:44px;border-radius:50%;
+    background:#F7931A;color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:26px;font-weight:700;font-family:Georgia,serif;
+  }
+  .symbol{font-size:14px;font-weight:800;margin-top:8px;}
+  .current{
+    margin-top:6px;font-size:13px;color:var(--gray);
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .chip{
+    background:var(--chip);color:var(--ink);
+    font-size:11.5px;font-weight:800;
+    padding:3px 7px;border-radius:5px;
+  }
+
+  /* ---------- stepper ---------- */
+  .stepper{
+    margin-top:16px;
+    height:48px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    display:flex;align-items:center;
+  }
+  .step-btn{
+    width:56px;height:100%;
+    background:none;border:0;cursor:pointer;
+    font-size:22px;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .step-btn:disabled{color:#C9CCD1;cursor:not-allowed;}
+  .step-val{
+    flex:1;text-align:center;border:0;outline:none;
+    font-size:16px;font-weight:600;font-family:inherit;
+    color:var(--ink);background:none;width:100%;
+  }
+
+  /* ---------- slider ---------- */
+  .slider-wrap{margin-top:22px;padding:0 2px;}
+  .rail{position:relative;height:20px;}
+  .rail-bg,.rail-fill{
+    position:absolute;top:8px;height:4px;border-radius:2px;
+  }
+  .rail-bg{left:0;right:0;background:var(--track);}
+  .rail-fill{left:0;background:var(--purple);}
+  .dot{
+    position:absolute;top:5px;width:10px;height:10px;border-radius:50%;
+    background:var(--track);transform:translateX(-50%);transition:background .12s;
+  }
+  .dot.on{background:var(--purple);}
+  input[type=range]{
+    position:absolute;top:0;left:0;width:100%;height:20px;
+    -webkit-appearance:none;appearance:none;background:none;margin:0;
+    cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px;height:20px;border-radius:50%;
+    background:#fff;border:2px solid var(--purple);
+    box-shadow:0 1px 4px rgba(0,0,0,.18);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px;height:20px;border-radius:50%;
+    background:#fff;border:2px solid var(--purple);
+    box-shadow:0 1px 4px rgba(0,0,0,.18);
+  }
+  .ticks{position:relative;height:16px;margin-top:4px;}
+  .tick{
+    position:absolute;font-size:11px;color:var(--gray);
+    transform:translateX(-50%);white-space:nowrap;
+  }
+  .tick:first-child{transform:none;}
+  .tick:last-child{transform:translateX(-100%);}
+
+  /* ---------- info panel ---------- */
+  .panel{
+    margin-top:18px;
+    background:var(--panel);
+    border-radius:10px;
+    padding:14px 14px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .row{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;}
+  .row .label{color:#4B4F56;}
+  .row .value{font-weight:700;letter-spacing:.1px;}
+  .row .value .after{color:var(--green);}
+  .row .value .arrow{color:var(--ink);font-weight:400;margin:0 4px;}
+
+  /* ---------- warning: reserved slot, no layout shift ---------- */
+  .warn-slot{
+    min-height:38px;
+    padding-top:12px;
+    font-size:13px;
+    line-height:1.35;
+    color:var(--amber);
+  }
+  .warn-slot[data-visible="false"] > *{visibility:hidden;}
+
+  .spacer{flex:1;}
+
+  .cta{
+    height:52px;width:100%;
+    background:var(--blue);color:#fff;
+    border:0;border-radius:10px;
+    font-family:inherit;font-size:16px;font-weight:800;
+    cursor:pointer;
+  }
+  .cta:active{filter:brightness(.94);}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:absolute;left:20px;right:20px;bottom:88px;
+    background:rgba(20,21,24,.92);color:#fff;
+    font-size:13px;padding:12px 14px;border-radius:10px;
+    text-align:center;opacity:0;transform:translateY(8px);
+    transition:opacity .18s,transform .18s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  /* ---------- prototype controls (outside the design) ---------- */
+  .controls{
+    width:390px;background:#fff;border:1px solid var(--border);
+    border-radius:12px;padding:14px 16px;font-size:12.5px;color:var(--gray);
+  }
+  .controls h4{margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#9AA0A6;font-weight:800;}
+  .controls label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;color:#4B4F56;}
+  .controls select,.controls input{
+    font-family:inherit;font-size:12.5px;padding:5px 8px;
+    border:1px solid var(--border);border-radius:6px;width:110px;
+  }
+  .controls p{margin:10px 0 0;line-height:1.5;font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="backdrop"></div>
+
+  <div class="sheet">
+    <div class="sheet-head">
+      <h1 class="title">Ubah Leverage</h1>
+      <button class="close" aria-label="Tutup">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="subtitle">Perubahan nilai leverage akan mempengaruhi leverage dari posisi terbuka dan open orders yang sedang berjalan</p>
+
+    <div class="pair">
+      <div class="coin">&#8383;</div>
+      <div class="symbol">BTCUSDT</div>
+      <div class="current">
+        Leverage Saat ini
+        <span class="chip" id="chipCurrent">10x</span>
+        <span class="chip">Cross</span>
+      </div>
+    </div>
+
+    <div class="stepper">
+      <button class="step-btn" id="minus" aria-label="Kurangi leverage">&minus;</button>
+      <input class="step-val" id="valInput" inputmode="numeric" value="10" aria-label="Nilai leverage">
+      <button class="step-btn" id="plus" aria-label="Tambah leverage">+</button>
+    </div>
+
+    <div class="slider-wrap">
+      <div class="rail">
+        <div class="rail-bg"></div>
+        <div class="rail-fill" id="fill"></div>
+        <div id="dots"></div>
+        <input type="range" id="slider" min="1" max="25" step="1" value="10" aria-label="Leverage slider">
+      </div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <span class="label">Margin Posisi (USDT)</span>
+        <span class="value"><span id="marginBefore">1,51</span><span class="arrow">&rarr;</span><span class="after" id="marginAfter">1,51</span></span>
+      </div>
+      <div class="row">
+        <span class="label">Est. Harga Likuidasi (USDT)</span>
+        <span class="value"><span id="liqBefore">0,2014</span><span class="arrow">&rarr;</span><span class="after" id="liqAfter">0,2014</span></span>
+      </div>
+    </div>
+
+    <div class="warn-slot" id="warnSlot" data-visible="false" role="status" aria-live="polite">
+      <span>Leverage yang tinggi meningkatkan risiko likuidasi.</span>
+    </div>
+
+    <div class="spacer"></div>
+
+    <button class="cta" id="confirm">Konfirmasi Ubah Leverage</button>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <h4>Prototype controls</h4>
+  <label>Leverage saat ini
+    <select id="ctrlCurrent">
+      <option>1</option><option>5</option><option selected>10</option>
+      <option>15</option><option>20</option><option>25</option>
+    </select>
+  </label>
+  <label>Arah posisi
+    <select id="ctrlSide">
+      <option value="long" selected>Long</option>
+      <option value="short">Short</option>
+    </select>
+  </label>
+  <p>Warning muncul hanya saat nilai terpilih lebih besar dari leverage saat ini. Tinggi bottom sheet dikunci 552px, slot warning selalu memakai ruang yang sama.</p>
+</div>
+
+<script>
+(function(){
+  var MIN = 1, MAX = 25;
+  var TICKS = [1,5,10,15,20,25];
+
+  // Position model. Notional is fixed; margin = notional / leverage.
+  var NOTIONAL   = 15.10;   // USDT — gives 1,51 margin at 10x
+  var ENTRY      = 0.22254; // USDT — gives 0,2014 est. liq at 10x long
+  var MMR        = 0.005;   // maintenance margin rate
+
+  var state = { current: 10, selected: 10, side: 'long' };
+
+  var slider = document.getElementById('slider');
+  var valInput = document.getElementById('valInput');
+  var fill = document.getElementById('fill');
+  var dotsBox = document.getElementById('dots');
+  var ticksBox = document.getElementById('ticks');
+  var warnSlot = document.getElementById('warnSlot');
+  var minus = document.getElementById('minus');
+  var plus = document.getElementById('plus');
+  var toast = document.getElementById('toast');
+
+  function pct(v){ return ((v - MIN) / (MAX - MIN)) * 100; }
+
+  // build ticks + dots
+  TICKS.forEach(function(t){
+    var d = document.createElement('div');
+    d.className = 'dot';
+    d.dataset.v = t;
+    d.style.left = pct(t) + '%';
+    dotsBox.appendChild(d);
+
+    var l = document.createElement('div');
+    l.className = 'tick';
+    l.style.left = pct(t) + '%';
+    l.textContent = t + 'x';
+    ticksBox.appendChild(l);
+  });
+
+  function fmt(n, dp){
+    return n.toFixed(dp).replace('.', ',');
+  }
+  function margin(lev){ return NOTIONAL / lev; }
+  function liq(lev){
+    var f = state.side === 'long' ? (1 - 1/lev + MMR) : (1 + 1/lev - MMR);
+    return ENTRY * f;
+  }
+
+  function render(){
+    var v = state.selected;
+
+    slider.value = v;
+    valInput.value = v;
+    fill.style.width = pct(v) + '%';
+
+    Array.prototype.forEach.call(dotsBox.children, function(d){
+      d.classList.toggle('on', Number(d.dataset.v) <= v);
+    });
+
+    minus.disabled = v <= MIN;
+    plus.disabled  = v >= MAX;
+
+    document.getElementById('chipCurrent').textContent = state.current + 'x';
+    document.getElementById('marginBefore').textContent = fmt(margin(state.current), 2);
+    document.getElementById('marginAfter').textContent  = fmt(margin(v), 2);
+    document.getElementById('liqBefore').textContent    = fmt(liq(state.current), 4);
+    document.getElementById('liqAfter').textContent     = fmt(liq(v), 4);
+
+    // Requirement: warning only when selected > current leverage
+    warnSlot.dataset.visible = (v > state.current) ? 'true' : 'false';
+  }
+
+  function setSelected(v){
+    if (v === '' || v === null || isNaN(Number(v))) v = state.current;
+    v = Math.round(Number(v));
+    state.selected = Math.min(MAX, Math.max(MIN, v));
+    render();
+  }
+
+  slider.addEventListener('input', function(){ setSelected(slider.value); });
+  minus.addEventListener('click', function(){ setSelected(state.selected - 1); });
+  plus.addEventListener('click',  function(){ setSelected(state.selected + 1); });
+  valInput.addEventListener('input', function(){
+    valInput.value = valInput.value.replace(/[^0-9]/g,'');
+  });
+  valInput.addEventListener('change', function(){ setSelected(valInput.value); });
+  valInput.addEventListener('blur', function(){ setSelected(valInput.value); });
+
+  document.getElementById('ctrlCurrent').addEventListener('change', function(e){
+    state.current = Number(e.target.value);
+    render();
+  });
+  document.getElementById('ctrlSide').addEventListener('change', function(e){
+    state.side = e.target.value;
+    render();
+  });
+
+  var t;
+  document.getElementById('confirm').addEventListener('click', function(){
+    var msg = state.selected === state.current
+      ? 'Leverage tetap ' + state.current + 'x'
+      : 'Leverage diubah ke ' + state.selected + 'x';
+    state.current = state.selected;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(t);
+    t = setTimeout(function(){ toast.classList.remove('show'); }, 1600);
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

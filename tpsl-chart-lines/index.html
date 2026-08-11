@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multiple TP/SL order lines on chart: design one pager</title>
+<style>
+  :root{
+    --ink:#16181D; --ink2:#5B6472; --ink3:#8A93A0;
+    --line:#E7EAEF; --line2:#D8DDE5; --bg:#FFFFFF; --surf:#F6F8FA;
+    --blue:#1F6BFF; --blueBg:#EAF1FF;
+    --red:#EA5350; --redBg:#FDECEB;
+    --green:#22AB63; --greenBg:#E7F6ED;
+    --amber:#C6820A; --amberBg:#FCF3E0;
+    --purple:#6B3FD6;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--surf); color:var(--ink);
+    font:400 15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:40px 24px 96px}
+  header.doc{border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:8px}
+  h1{font-size:26px; line-height:1.25; font-weight:600; margin:0 0 8px}
+  h2{font-size:19px; font-weight:600; margin:44px 0 6px; letter-spacing:-.01em}
+  h3{font-size:15px; font-weight:600; margin:22px 0 4px}
+  p{margin:8px 0}
+  .lede{color:var(--ink2); font-size:16px; margin:0}
+  .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+  .tag{font-size:12px; padding:3px 9px; border-radius:999px; background:var(--surf); border:1px solid var(--line); color:var(--ink2)}
+  .card{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0}
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px}
+  .call{border-left:3px solid var(--blue); background:var(--blueBg); border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0}
+  .call.warn{border-left-color:var(--amber); background:var(--amberBg)}
+  .call.bad{border-left-color:var(--red); background:var(--redBg)}
+  .call p{margin:4px 0}
+  .k{font-family:var(--mono); font-size:13px; background:var(--surf); border:1px solid var(--line); border-radius:5px; padding:1px 5px}
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; background:var(--bg)}
+  th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink3); background:var(--surf)}
+  tr:last-child td{border-bottom:none}
+  pre{background:#15171C; color:#E6E9EF; border-radius:10px; padding:18px 20px; overflow-x:auto;
+      font-family:var(--mono); font-size:12.5px; line-height:1.65; margin:12px 0}
+  pre .c{color:#7C8798} pre .kw{color:#8FB8FF} pre .st{color:#9BE0B5} pre .nm{color:#F0C177}
+  ul{margin:8px 0 8px 20px; padding:0} li{margin:5px 0}
+  .sub{color:var(--ink2); font-size:14px}
+  .badge{display:inline-block; font-size:11px; font-weight:600; padding:2px 7px; border-radius:5px; font-family:var(--mono)}
+  .b-tp{background:var(--greenBg); color:#12693D} .b-sl{background:var(--redBg); color:#9E2B28}
+  .b-ok{background:var(--greenBg); color:#12693D} .b-no{background:var(--redBg); color:#9E2B28}
+  .b-chk{background:var(--amberBg); color:#8A5A05}
+
+  /* prototype */
+  .stage{background:#E9ECF1; border:1px solid var(--line); border-radius:16px; padding:26px; display:flex; gap:26px; flex-wrap:wrap; justify-content:center; margin:16px 0}
+  .phone{width:390px; flex:0 0 390px; background:#fff; border-radius:26px; border:1px solid var(--line2); overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .panel{flex:1 1 300px; min-width:280px; max-width:360px}
+  .ctl{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px}
+  .ctl label{font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink3); font-weight:600}
+  input[type=range]{width:100%; margin:10px 0 2px; accent-color:var(--blue)}
+  .tier{font-family:var(--mono); font-size:12.5px; color:var(--ink2)}
+  .tierName{font-weight:600; color:var(--ink); font-size:14px; font-family:inherit}
+  .legend{display:flex; flex-direction:column; gap:7px; margin-top:14px; font-size:13px; color:var(--ink2)}
+  .legend i{display:inline-block; width:18px; height:0; border-top-width:2px; margin-right:8px; vertical-align:3px}
+
+  /* phone chrome */
+  .sbar{display:flex; justify-content:space-between; align-items:center; padding:9px 18px 4px; font-size:13px; font-weight:600}
+  .tabs{display:flex; gap:20px; padding:6px 16px 0; border-bottom:1px solid var(--line); font-size:15px; color:var(--ink3)}
+  .tabs b{color:var(--blue); font-weight:600; border-bottom:2px solid var(--blue); padding-bottom:7px}
+  .tabs span{padding-bottom:7px}
+  .symrow{display:flex; align-items:center; gap:8px; padding:10px 14px 2px}
+  .dot{width:22px;height:22px;border-radius:50%;background:#F7931A;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .lev{font-size:11px; background:var(--surf); border-radius:4px; padding:1px 6px; color:var(--ink2); font-weight:600}
+  .px{font-size:23px; font-weight:600; padding:2px 14px 0; letter-spacing:-.02em}
+  .pxsub{padding:0 14px; font-size:12.5px; color:var(--green); font-weight:600}
+  .subtabs{display:flex; gap:16px; padding:10px 14px 0; border-bottom:1px solid var(--line); font-size:14px; color:var(--ink3)}
+  .subtabs b{color:var(--blue); border-bottom:2px solid var(--blue); padding-bottom:8px; font-weight:600}
+  .subtabs span{padding-bottom:8px}
+  .tfrow{display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:12.5px; color:var(--ink2)}
+  .tfrow .on{background:var(--blueBg); color:var(--blue); font-weight:600; border-radius:6px; padding:3px 8px}
+  .chartbox{position:relative; height:300px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:#fff;
+            touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none}
+  .chartbox.grabbing{cursor:grabbing}
+  .plot{position:absolute; inset:0 78px 18px 0; overflow:hidden}
+  .rail{position:absolute; top:0; bottom:18px; right:74px; width:4px; overflow:hidden; background:#F2F4F7}
+  .axis{position:absolute; top:0; bottom:18px; right:0; width:74px; border-left:1px solid var(--line); background:#fff}
+  .taxis{position:absolute; left:0; right:0; bottom:0; height:18px; border-top:1px solid var(--line); background:#fff}
+  .taxis span{position:absolute; top:3px; transform:translateX(-50%); font-family:var(--mono); font-size:8.5px; color:var(--ink3)}
+  .latest{position:absolute; right:80px; top:2px; font-family:var(--mono); font-size:9px; padding:0 5px; border-radius:4px;
+          background:var(--blueBg); color:var(--blue); border:1px solid #C7DBFF; cursor:pointer; line-height:13px}
+  .axis div{position:absolute; right:5px; font-family:var(--mono); font-size:8.5px; color:var(--ink3); transform:translateY(-50%); white-space:nowrap}
+  .chip{position:absolute; right:8px; transform:translateY(-50%); font-family:var(--mono); font-size:10.5px; font-weight:600;
+        padding:2px 6px; border-radius:5px; white-space:nowrap; border:1px solid; cursor:pointer}
+  .oline{position:absolute; left:0; right:0; border-top-width:1px; border-top-style:solid}
+  .edge{position:absolute; right:8px; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:5px;
+        background:#fff; border:1px solid var(--line2); color:var(--ink2)}
+  .obar{display:flex; gap:8px; padding:12px 14px; align-items:center}
+  .obar button{flex:1; border:0; border-radius:8px; padding:12px 0; font-size:15px; font-weight:600; color:#fff; font-family:inherit}
+  .sheet{border-top:1px solid var(--line); background:#fff; padding:12px 14px 16px}
+  .sheet .hd{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+  .sheet .hd b{font-size:14.5px; font-weight:600}
+  .row{display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--line); font-size:12.5px}
+  .row .p{font-family:var(--mono); font-weight:600; flex:1}
+  .row .q{color:var(--ink2); font-family:var(--mono)}
+  .mini{border:1px solid var(--line2); background:#fff; border-radius:6px; font-size:11.5px; padding:3px 8px; color:var(--ink2); font-family:inherit}
+  .nav{display:flex; border-top:1px solid var(--line); font-size:9.5px; color:var(--ink3); text-align:center}
+  .nav div{flex:1; padding:8px 0}
+  .nav div.on{color:var(--purple); font-weight:600}
+  footer{margin-top:56px; padding-top:16px; border-top:1px solid var(--line); color:var(--ink3); font-size:13px}
+  @media print{ body{background:#fff} .stage{background:#fff} pre{background:#fff; color:#000; border:1px solid var(--line2)} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>Showing unlimited TP/SL orders on the futures chart</h1>
+  <p class="lede">Density based clustering instead of a fixed cap. One rule that scales from 2 orders to 50, and degrades predictably instead of hiding things the trader is watching.</p>
+  <div class="meta">
+    <span class="tag">BTCIDR-PERP · Futures</span>
+    <span class="tag">One way mode</span>
+    <span class="tag">No order count limit</span>
+    <span class="tag">TradingView Advanced Charts</span>
+    <span class="tag">Mobile first</span>
+    <span class="tag">Draft for design, eng and PM review</span>
+  </div>
+</header>
+
+<h2>1. The problem, stated precisely</h2>
+<p>A position can carry any number of TP and SL orders. Each one wants a horizontal line and a label at its price. The failure is not "too many orders", it is <b>too many labels inside too few vertical pixels</b>. The same 6 orders are perfectly readable at one zoom level and an unreadable pile at another, so any solution keyed to order count is solving the wrong variable.</p>
+
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">What crowding actually costs</h3>
+    <ul class="sub" style="margin-left:18px">
+      <li>Labels overlap, so no price is readable</li>
+      <li>Drag targets collide, so the trader edits the wrong order (real money, no undo)</li>
+      <li>The candles disappear behind chrome, so the chart stops being a chart</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Local constraints that shape this</h3>
+    <ul class="sub" style="margin-left:18px">
+      <li>IDR prices are 13 characters (1.650.000.000), the widest labels in the industry</li>
+      <li>The price axis already eats 74 of 390pt of width</li>
+      <li>Touch, so no hover to disambiguate and a 44pt minimum target</li>
+    </ul>
+  </div>
+</div>
+
+<h2>2. The core decision</h2>
+<p>Cluster by <b>pixel proximity</b>, not by count. Group adjacent same side orders whose y positions are closer than one label height (24px), collapse each group into a single chip, and let zoom resolve them. Nothing is ever hidden, only merged, and the merge is undone by a gesture traders already perform constantly.</p>
+
+<div class="call bad">
+  <p><b>Why not a maximum of X orders shown</b></p>
+  <p class="sub">A cap forces you to invent a ranking rule, and every rule silently hides an order somebody was watching. "Where is my stop?" is a trust failure that a crowded chart never causes. A cap also behaves discontinuously: the 6th order appears or vanishes for reasons the trader cannot see, and it stays broken at every zoom level because zoom is not part of the rule.</p>
+</div>
+
+<div class="call">
+  <p><b>Collapse the labels, not the lines</b></p>
+  <p class="sub">Lines are visually cheap and the shape of the ladder is information: four thin lines bunched above price reads instantly as "scaling out here". Chips, prices and drag handles are what create the jank. So keep drawing every line, and let only one label per cluster survive.</p>
+</div>
+
+<h2>3. Three tiers, one rule</h2>
+<p>These are not three modes to build and toggle. They are what the single clustering rule produces at different densities, which is why it holds at any order count.</p>
+<table>
+  <thead><tr><th style="width:78px">Tier</th><th>Condition</th><th>Chart shows</th><th>Editing</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Resolved</b></td>
+      <td>Every gap &ge; 24px</td>
+      <td>One line and one full label per order, price and qty visible</td>
+      <td>Direct drag on the line</td>
+    </tr>
+    <tr>
+      <td><b>Clustered</b></td>
+      <td>Some gaps &lt; 24px</td>
+      <td>All lines drawn at 40% opacity, one chip per group (<span class="badge b-tp">4 TP · 55%</span>), a bracket showing the group's price extent</td>
+      <td>Tap chip, sheet lists the group, drag disabled until resolved</td>
+    </tr>
+    <tr>
+      <td><b>Collapsed</b></td>
+      <td>All orders of a side inside 24px</td>
+      <td>One blended line at the qty weighted average, one chip with the total, density rail keeps the full picture</td>
+      <td>Sheet only, plus "zoom to separate"</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4. Prototype</h2>
+<p>Built on the current BTCIDR-PERP chart tab. The scenario is a long with 6 TP and 3 SL orders, which is a realistic scale out ladder and already enough to break a naive implementation.</p>
+<ul>
+  <li><b>Drag the chart</b> to pan. Horizontally it scrolls through time and the order lines stay pinned. Vertically it changes which orders are on screen, so clusters re-form and edge chips update live.</li>
+  <li><b>Drag the zoom slider</b> to move through all three tiers.</li>
+  <li><b>Tap a grouped chip</b> (<span class="badge b-tp">4 TP · 55%</span>) to open the sheet, then use Pisahkan to zoom until the group resolves.</li>
+  <li><b>Return to centre</b> with the "terkini" control that appears on the time axis once you have panned away.</li>
+</ul>
+
+<div class="stage">
+  <div class="phone" id="phone"></div>
+  <div class="panel">
+    <div class="ctl">
+      <label for="zoom">Chart zoom (visible price range)</label>
+      <input type="range" id="zoom" min="40" max="620" step="5" value="220" />
+      <div class="tier"><span id="zoomval"></span> · <span id="ppu"></span></div>
+      <div class="tier" id="panstate" style="margin-top:2px"></div>
+      <div class="tier" style="margin-top:8px;color:var(--ink3)">Drag the chart to pan. Vertical pan changes which orders are on screen and recomputes clusters live. Horizontal pan never moves an order line.</div>
+      <div style="margin-top:12px" class="tierName" id="tiername"></div>
+      <div class="tier" id="tierwhy"></div>
+      <div class="legend">
+        <div><i style="border-top:2px dashed var(--green)"></i>TP order line</div>
+        <div><i style="border-top:2px dashed var(--red)"></i>SL order line</div>
+        <div><i style="border-top:2px solid var(--ink3)"></i>Entry price (anchor, never collapses)</div>
+        <div><i style="border-top:2px solid var(--amber)"></i>Liquidation price (anchor, never collapses)</div>
+        <div><i style="border-top:2px solid var(--blue)"></i>Mark price</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="call warn">
+  <p><b>Read the chips, not the prices</b></p>
+  <p class="sub">A full IDR price does not fit a chip on a 390pt screen next to a 74pt axis, so chips carry the short form (1,646 M) plus qty share, and the sheet carries the exact price. This is the one place where the local number format changes the pattern rather than just the styling.</p>
+</div>
+
+<h2>5. Interaction rules</h2>
+
+<h3>Label lanes</h3>
+<p>Position anchors (mark, entry, liquidation) live in the left lane and never collapse, because they are what a trader reads position state from. Orders live in the right lane against the axis. Two lanes means the two categories can never collide, which removes most overlap before clustering runs.</p>
+
+<h3>Panning</h3>
+<p>The two axes are not symmetrical, and treating them the same is the mistake to avoid. Horizontal panning is pure time travel: order lines are price anchored, span the full width and must not move, so the overlay needs no recalculation at all. Vertical panning is the expensive one, because it changes the price to pixel mapping, which changes cluster membership, which changes what is on screen. Every off screen order becomes an edge chip the moment it leaves the viewport, which is what makes vertical panning feel safe rather than lossy.</p>
+<p>Two consequences for the build. First, panning must never grab an order: the chart owns the whole surface, chips own their own hit area, and picking up a line requires a long press. Second, once the trader has panned away from mark price they need one tap back, so a return control appears on the time axis. In production that should follow chart convention and split into two, auto scale on the price axis and scroll to latest on the time axis, rather than one combined reset.</p>
+<p>Panning also promotes the density rail from a nice to have into load bearing UI. With a fixed price domain and a viewport window drawn on it, the rail becomes a vertical scroll indicator: it shows where you are in the ladder, how much of it is above or below the fold, and that nothing has been dropped. It is what lets you pan aggressively without losing the plot.</p>
+
+<h3>Chip de-overlap</h3>
+<p>Clustering alone is not sufficient, and testing the logic proved it. TP and SL must never merge into one chip because the merge would be semantically wrong, so a TP cluster sitting just above price and an SL cluster just below can still collide. The fix is a second pass: lines stay at their true price, chips get pushed apart to the 24px minimum, and a short leader line owns the difference. Twenty orders inside a 0,5% band produced two colliding chips before this pass and zero after it.</p>
+
+<h3>Weight encoding</h3>
+<p>Line opacity and thickness scale with qty share, so a 40% TP reads heavier than a 5% one. This answers "which of these matters" at exactly the moment labels are unavailable.</p>
+
+<h3>Drag safety</h3>
+<ul>
+  <li>A collapsed line has no single price, so dragging it is ambiguous. Drag is <b>disabled</b> on cluster chips. Expand first, then drag one resolved line.</li>
+  <li>Hit area is 44pt tall even though the line is 1px, and only one handle can be active at a time.</li>
+  <li>On drag, show a magnified callout with the live price, distance % and estimated PnL, and enforce a minimum one tick gap on drop.</li>
+  <li>Long press to pick up (not tap and slide), so chart panning stays the default gesture. Panning must never move an order.</li>
+</ul>
+
+<h3>Off screen orders</h3>
+<p>Edge chips (<span class="badge b-sl">&darr; 2 SL · 70%</span>) plus the density rail keep the whole ladder accounted for when the viewport only holds part of it. One chip <b>per side per edge</b>, never one merged chip: pan far enough and both TP and SL can end up above the fold at once, and a single chip would have to lie about the side. Testing the pan states confirmed all 9 orders stay accounted for at every zoom and pan position, which is the invariant the whole pattern rests on.</p>
+
+<h2>6. Pseudocode</h2>
+<p>Language agnostic, and deliberately independent of the charting library. The only thing it needs from the chart is a price to y mapping and a redraw signal, which keeps it testable in isolation and portable if the chart layer changes.</p>
+<pre><span class="c">// Runs on every redraw: visible range changed, order list changed, pane resized.</span>
+<span class="c">// Deliberately knows nothing about TradingView beyond yOf() and a redraw signal.</span>
+
+<span class="kw">STEP 1: SETUP AND BAIL OUT</span>
+  scale = chart.pane(0).mainPriceScale()
+  <span class="kw">IF</span> scale == null <span class="kw">OR</span> scale.mode() != REGULAR:          <span class="c">// log / percent / indexed</span>
+      hideChips(); showListOnlyAffordance(); <span class="kw">RETURN</span>
+  { from, to } = scale.getVisiblePriceRange()
+  H            = chart.pane(0).getHeight()
+  <span class="nm">yOf</span>(price)   = (to - price) / (to - from) * H            <span class="c">// linear only</span>
+
+<span class="kw">STEP 2: PARTITION VISIBLE VS OFF SCREEN</span>
+  visible = [], offAbove = [], offBelow = []
+  <span class="kw">FOR</span> order <span class="kw">IN</span> orders:
+      y = <span class="nm">yOf</span>(order.price)
+      <span class="kw">IF</span>      y &lt; EDGE_PAD      -&gt; offAbove.push(order)
+      <span class="kw">ELSE IF</span> y &gt; H - EDGE_PAD  -&gt; offBelow.push(order)
+      <span class="kw">ELSE</span>                       -&gt; visible.push({ order, y })
+
+<span class="kw">STEP 3: CLUSTER BY PIXEL PROXIMITY</span>    <span class="c">// the whole idea, 8 lines</span>
+  sort visible by y ascending
+  clusters = []
+  <span class="kw">FOR</span> v <span class="kw">IN</span> visible:
+      last = clusters.last()
+      <span class="kw">IF</span> last exists
+         <span class="kw">AND</span> last.side == v.order.side                      <span class="c">// never mix TP with SL</span>
+         <span class="kw">AND</span> (v.y - last.lastY) &lt; THRESHOLD_PX:            <span class="c">// 24px = chip height</span>
+          last.add(v)
+      <span class="kw">ELSE</span>
+          clusters.push(newCluster(v))
+
+<span class="kw">STEP 4: RENDER</span>
+  <span class="kw">FOR</span> c <span class="kw">IN</span> clusters:
+      <span class="kw">FOR</span> v <span class="kw">IN</span> c.items:                                    <span class="c">// always draw every line</span>
+          drawLine(y       = v.y,
+                   color   = c.side == TP ? green : red,
+                   opacity = c.size &gt; 1 ? 0.4 : 1.0,
+                   weight  = lerp(1, 2.5, v.order.qtyShare))       <span class="c">// weight = conviction</span>
+      <span class="kw">IF</span> c.size == 1:
+          chips.push({ y: c.items[0].y, text: <span class="st">"TP 1,646 M · 10%"</span>, draggable: <span class="kw">true</span> })
+      <span class="kw">ELSE</span>:
+          drawBracket(c.firstY, c.lastY)                            <span class="c">// group extent</span>
+          chips.push({ y: c.midY, tappable: <span class="kw">true</span>,
+                       text: c.size + <span class="st">" "</span> + c.side + <span class="st">" · "</span> + c.totalQtyShare + <span class="st">"%"</span> })
+
+<span class="kw">STEP 4B: CHIP DE-OVERLAP</span>   <span class="c">// TP and SL must never merge into one chip, so two</span>
+                             <span class="c">// adjacent clusters of opposite sides can still collide</span>
+  sort chips by y
+  forward pass:   ch.cy = max(ch.y, previous.cy + THRESHOLD_PX)
+  backward pass:  clamp ch.cy inside [top+12, bottom-12] and re-push upward
+                  so the forward pass cannot overflow the pane
+  <span class="kw">FOR</span> ch <span class="kw">IN</span> chips:
+      <span class="kw">IF</span> abs(ch.cy - ch.y) &gt; 3:
+          drawLeaderLine(ch.y, ch.cy)        <span class="c">// the line stays true, only the label moves</span>
+      drawChip(ch.cy, ch.text)
+
+  drawAnchors(mark, entry, liquidation)      <span class="c">// left lane, exempt from clustering</span>
+  <span class="kw">IF</span> offAbove: drawEdgeChip(TOP, offAbove)
+  <span class="kw">IF</span> offBelow: drawEdgeChip(BOTTOM, offBelow)
+  drawDensityRail(orders, fixedDomain, viewportWindow)
+
+<span class="kw">STEP 5: INPUT</span>
+  <span class="kw">ON</span> tap(chip) <span class="kw">WHERE</span> chip.cluster.size &gt; 1:
+      openSheet(chip.cluster.items)                                 <span class="c">// + "zoom to separate"</span>
+  <span class="kw">ON</span> longPress(chip) <span class="kw">WHERE</span> chip.cluster.size == 1:
+      beginDrag(chip.order)                                         <span class="c">// 44pt hit area</span>
+  <span class="kw">ON</span> drag(order, y):
+      price = snapToTick(priceOf(y))
+      price = clampToValidSide(price, order.side, markPrice)
+      <span class="kw">IF</span> withinOneTickOfSibling(price): block, show hint
+      showMagnifiedCallout(price, distancePct, estimatedPnl)
+  <span class="kw">ON</span> release: confirmModify(order, price)
+
+<span class="kw">INVARIANTS</span>
+  1. no order is ever hidden, only merged
+  2. a merged line is never draggable                    <span class="c">// ambiguous price = real money risk</span>
+  3. anchors never cluster
+  4. recompute on RANGE change, not on price TICK        <span class="c">// otherwise labels reflow every frame</span>
+  5. THRESHOLD_PX derives from the chip height token, not a magic number
+  6. Advanced Charts fires no event for vertical scale change, so poll
+     getVisiblePriceRange() + getHeight() on rAF and bail when unchanged
+  7. the line always marks the true price, the chip is allowed to move,
+     and a leader line owns the difference
+  8. horizontal pan invalidates nothing: lines are price anchored and span
+     the full width. only vertical pan, pinch and zoom invalidate the layout,
+     so gate the whole redraw on a change in { from, to, H }</pre>
+
+<h2>7. TradingView Advanced Charts: what is and is not available</h2>
+<p>This is the part to validate with engineering before committing to the pattern. Verified against the current Advanced Charts docs.</p>
+<table>
+  <thead><tr><th style="width:150px">Capability</th><th style="width:88px">Status</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td>Native order lines</td><td><span class="badge b-no">Not available</span></td>
+      <td><span class="k">createOrderLine()</span> and <span class="k">createPositionLine()</span> became Trading Platform only from v29. On Advanced Charts they cannot be used, so the built in drag, cancel button and quantity label do not exist for us.</td></tr>
+    <tr><td>Price to pixel</td><td><span class="badge b-no">Not available</span></td>
+      <td>No public <span class="k">priceToCoordinate</span> in Advanced Charts. We compute y ourselves from <span class="k">IPriceScaleApi.getVisiblePriceRange()</span> and <span class="k">IPaneApi.getHeight()</span>.</td></tr>
+    <tr><td>Visible price range</td><td><span class="badge b-ok">Available</span></td>
+      <td><span class="k">activeChart().getPanes()[0].getMainSourcePriceScale().getVisiblePriceRange()</span> returns <span class="k">{from, to}</span>. Returns null when the main source is in "No Scale" mode, so guard it.</td></tr>
+    <tr><td>Scale mode</td><td><span class="badge b-chk">Guard needed</span></td>
+      <td><span class="k">IPriceScaleApi.getMode()</span> exposes log / percent / indexed, and <span class="k">isInverted()</span>. Our linear mapping is only correct in regular mode. Either implement the log mapping or hide order chips and fall back to the sheet in non linear modes.</td></tr>
+    <tr><td>Redraw signal</td><td><span class="badge b-chk">Risk</span></td>
+      <td><span class="k">onVisibleRangeChanged()</span>, <span class="k">crossHairMoved()</span> and widget events <span class="k">reset_scales</span>, <span class="k">panes_height_changed</span>, <span class="k">mouse_down</span> / <span class="k">mouse_up</span> exist, but <b>no event fires for vertical price scale change</b>. Vertical pan, pinch and price axis drag therefore need a requestAnimationFrame loop that dirty checks <span class="k">{from, to}</span> and pane height, and returns early when unchanged. Horizontal pan is free because it cannot move a price anchored line. This is the main perf item to prove in the spike.</td></tr>
+    <tr><td>Drawing shapes</td><td><span class="badge b-chk">Fallback only</span></td>
+      <td><span class="k">createShape({price},{shape:'horizontal_line'})</span> with <span class="k">lock</span>, <span class="k">disableSelection</span>, <span class="k">disableSave</span>, <span class="k">disableUndo</span>, <span class="k">zOrder</span>. Fine for static lines, but shapes are drawings: they cannot carry our chip UI or clustering, and cost per shape is undocumented. Use for lines only, or not at all.</td></tr>
+    <tr><td>Overlay host</td><td><span class="badge b-chk">Constraint</span></td>
+      <td>The library renders inside an iframe, so our layer is a sibling absolutely positioned over it. It needs <span class="k">pointer-events:none</span> on the container and <span class="k">auto</span> only on chips and handles, otherwise we swallow pan and zoom.</td></tr>
+  </tbody>
+</table>
+
+<div class="call warn">
+  <p><b>The honest summary for PM</b></p>
+  <p class="sub">The pattern is buildable on Advanced Charts, but nothing about order lines comes for free. We own the overlay, the coordinate math, the drag behaviour and the redraw loop. The upside of owning it is that clustering, IDR label shortening and cluster sheets are all impossible with native order lines anyway, so we would be writing this layer even on Trading Platform. Recommend a one week spike on the redraw loop and vertical pinch before we commit to the interaction.</p>
+</div>
+
+<h2>8. Edge cases to design for</h2>
+<ul>
+  <li><b>Partial fill mid cluster.</b> The chip count changing under the trader's finger is the ugliest case here. Animate the count, keep the sheet open, never reorder rows while a row is being touched.</li>
+  <li><b>Price crossing the ladder.</b> With price moving through a tight cluster every tick, labels must not reflow on each frame. Recompute clusters on range change, not on price tick, and let the mark line move freely through them.</li>
+  <li><b>Low volatility pair, tight range.</b> Worst case is many orders inside a narrow band, not many orders overall. Test with 20 orders inside 0,5%.</li>
+  <li><b>One order.</b> The pattern must not look like a system at n=1. A single TP shows one plain line and one label, no bracket, no chip affordance.</li>
+  <li><b>Log or percent scale.</b> Chips hide and the sheet becomes the source of truth until the mapping is implemented.</li>
+  <li><b>Order rejected or cancelled server side.</b> The line must disappear with a reason, not just vanish from the overlay.</li>
+</ul>
+
+<h2>9. Open questions</h2>
+<ul>
+  <li>Do we need the blended average line in the collapsed tier, or is the total chip enough? Worth a quick usability test with 5 active futures traders.</li>
+  <li>Should the density rail be persistent or only appear while a cluster exists?</li>
+  <li>Is 24px the right threshold on our type scale, or should it be derived from the chip height token so it survives a typography change?</li>
+  <li>Does the trading team want cluster level actions (cancel all TP in this group) or is per order enough for v1?</li>
+</ul>
+
+<footer>Draft one pager · prototype and logic are illustrative, numbers are mock data. TradingView API notes verified against the current Advanced Charts documentation and should be re-checked against our pinned library version.</footer>
+</div>
+
+<script>
+(function(){
+  var CH = 282, PW = 312, THRESH = 24, PAD = 6, BS = 5, NB = 170;
+  var MARK = 1628000000, ENTRY = 1512000000, LIQ = 1451000000;
+  var RTOP = 1780000000, RBOT = 1420000000;
+  var HOME = (NB-1)*BS - PW + 14;
+  var scrollX = HOME, centerP = MARK, panning = false;
+  var GREEN = "#22AB63", GREENBG = "#E7F6ED", GREENTX = "#12693D";
+  var RED = "#EA5350", REDBG = "#FDECEB", REDTX = "#9E2B28";
+
+  var orders = [
+    { id:"tp1", side:"TP", price:1635000000, qty:20 },
+    { id:"tp2", side:"TP", price:1642000000, qty:15 },
+    { id:"tp3", side:"TP", price:1646000000, qty:10 },
+    { id:"tp4", side:"TP", price:1650000000, qty:10 },
+    { id:"tp5", side:"TP", price:1678000000, qty:25 },
+    { id:"tp6", side:"TP", price:1720000000, qty:20 },
+    { id:"sl1", side:"SL", price:1598000000, qty:30 },
+    { id:"sl2", side:"SL", price:1592000000, qty:30 },
+    { id:"sl3", side:"SL", price:1560000000, qty:40 }
+  ];
+
+  var sd = 7;
+  function rnd(){ sd = (sd * 1103515245 + 12345) % 2147483648; return sd / 2147483648; }
+  var cd = [], cp = 1548000000;
+  for (var i = 0; i < NB; i++){
+    var o = cp, c = o + (rnd() - 0.47) * 12000000;
+    cd.push({ o:o, c:c, h:Math.max(o,c) + rnd()*3200000, l:Math.min(o,c) - rnd()*3200000, m:412 + i });
+    cp = c;
+  }
+  var sh = MARK - cd[NB-1].c;
+  cd.forEach(function(k){ k.o+=sh; k.c+=sh; k.h+=sh; k.l+=sh; });
+  function hhmm(m){ m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0"); }
+
+  function F(v){ return Math.round(v).toLocaleString("id-ID"); }
+  function S(v){ return (v/1e9).toLocaleString("id-ID",{minimumFractionDigits:3,maximumFractionDigits:3}) + " M"; }
+  function pct(v){ return ((v-MARK)/MARK*100).toFixed(2).replace(".",",") + "%"; }
+
+  var phone = document.getElementById("phone");
+  phone.innerHTML =
+    '<div class="sbar"><span>9:41</span><span style="letter-spacing:1px">&#9679;&#9679;&#9679;</span></div>'
+    + '<div class="tabs"><span>Spot</span><b>Futures</b><span>Saham AS</span><span>Options</span></div>'
+    + '<div class="symrow"><div class="dot">&#8383;</div><b style="font-size:16px">BTCIDR</b>'
+    + '<span style="color:var(--ink3);font-size:15px">-PERP</span><span class="lev">25x</span></div>'
+    + '<div class="px">' + F(MARK) + '</div>'
+    + '<div class="pxsub">&#9650; 20.000.000 (+2,56%)</div>'
+    + '<div class="subtabs"><span>Trade</span><b>Chart</b><span>Posisi</span><span>Order</span><span>Margin</span></div>'
+    + '<div class="tfrow"><span class="on">1m</span><span>15m</span><span>1h</span><span>1D</span>'
+    + '<span>Lainnya</span><span style="margin-left:auto">Depth</span></div>'
+    + '<div class="chartbox" id="cbox"></div>'
+    + '<div id="bottom"></div>'
+    + '<div class="nav"><div>Spot</div><div>Futures</div><div class="on">Trade</div><div>Saham AS</div><div>Feed</div><div>Portfolio</div></div>';
+
+  var cbox = document.getElementById("cbox");
+  var bottom = document.getElementById("bottom");
+  var zoom = document.getElementById("zoom");
+  var clusters = [], openIdx = null;
+
+  function render(){
+    var range = +zoom.value * 1000000;
+    centerP = Math.max(RBOT + range/2, Math.min(RTOP - range/2, centerP));
+    scrollX = Math.max(0, Math.min(HOME + 60, scrollX));
+    var top = centerP + range/2, bot = centerP - range/2;
+    function y(p){ return (top - p) / range * CH; }
+    var ppu = CH / range;
+
+    document.getElementById("zoomval").textContent = "range " + F(range/1e6) + " juta";
+    document.getElementById("ppu").textContent = F(range/CH/1e3) + " ribu per px";
+    var homed = Math.abs(scrollX - HOME) < 1 && Math.abs(centerP - MARK) < range * 0.02;
+    document.getElementById("panstate").textContent =
+      "pusat " + F(centerP) + " · " + Math.round((HOME - scrollX)/BS) + " bar dari terkini"
+      + (homed ? "" : " · belum terpusat");
+
+    var plot = "";
+    var i0 = Math.max(0, Math.floor(scrollX/BS) - 2);
+    var i1 = Math.min(NB - 1, Math.ceil((scrollX + PW)/BS) + 2);
+    for (var i = i0; i <= i1; i++){
+      var k = cd[i], isUp = k.c >= k.o, col = isUp ? GREEN : RED, x = i*BS - scrollX;
+      plot += '<div style="position:absolute;left:'+(x+1)+'px;top:'+y(k.h)+'px;width:1px;height:'+Math.max(1,(k.h-k.l)*ppu)+'px;background:'+col+';opacity:.55"></div>';
+      plot += '<div style="position:absolute;left:'+x+'px;top:'+y(Math.max(k.o,k.c))+'px;width:3px;height:'+Math.max(1,Math.abs(k.c-k.o)*ppu)+'px;background:'+col+'"></div>';
+    }
+
+    [{l:"Mark",p:MARK,c:"#1F6BFF",b:"#EAF1FF",t:"#0B3EA8"},
+     {l:"Entry",p:ENTRY,c:"#8A93A0",b:"#F2F4F7",t:"#3A4250"},
+     {l:"Liq",p:LIQ,c:"#C6820A",b:"#FCF3E0",t:"#7A5106"}].forEach(function(a){
+      var ay = y(a.p);
+      if (ay < -4 || ay > CH + 4) return;
+      plot += '<div class="oline" style="top:'+ay+'px;border-top-color:'+a.c+';'+(a.l==="Mark"?"":"border-top-style:solid")+'"></div>';
+      plot += '<div style="position:absolute;left:4px;top:'+ay+'px;transform:translateY(-50%);background:'+a.b+';color:'+a.t
+           +';font-family:var(--mono);font-size:9.5px;font-weight:600;padding:1px 4px;border-radius:4px;white-space:nowrap">'
+           + a.l + " " + S(a.p) + '</div>';
+    });
+
+    var vis = [], offN = 0;
+    var off = { up:{ TP:{n:0,q:0}, SL:{n:0,q:0} }, dn:{ TP:{n:0,q:0}, SL:{n:0,q:0} } };
+    orders.forEach(function(o){
+      var oy = y(o.price), g = null;
+      if (oy < PAD) g = off.up[o.side];
+      else if (oy > CH - PAD) g = off.dn[o.side];
+      if (g){ g.n++; g.q += o.qty; offN++; }
+      else vis.push({ o:o, y:oy });
+    });
+    vis.sort(function(a,b){ return a.y - b.y; });
+
+    clusters = [];
+    vis.forEach(function(v){
+      var last = clusters[clusters.length-1];
+      if (last && last.side === v.o.side && v.y - last.items[last.items.length-1].y < THRESH) last.items.push(v);
+      else clusters.push({ side:v.o.side, items:[v] });
+    });
+
+    var chips = [];
+    clusters.forEach(function(c, ci){
+      var isTP = c.side === "TP";
+      var col = isTP ? GREEN : RED, bg = isTP ? GREENBG : REDBG, tx = isTP ? GREENTX : REDTX;
+      var many = c.items.length > 1;
+      var qty = 0;
+      c.items.forEach(function(v){ qty += v.o.qty; });
+      c.items.forEach(function(v){
+        plot += '<div class="oline" style="top:'+v.y+'px;border-top-color:'+col
+             +';border-top-style:dashed;border-top-width:'+(1 + v.o.qty/40).toFixed(2)+'px;opacity:'+(many?.4:1)+'"></div>';
+      });
+      var my = c.items.reduce(function(a,v){ return a+v.y; },0) / c.items.length;
+      if (many){
+        var y0 = c.items[0].y, y1 = c.items[c.items.length-1].y;
+        plot += '<div style="position:absolute;right:98px;top:'+y0+'px;height:'+(y1-y0)+'px;width:5px;border:1px solid '+col+';border-left:none;opacity:.7"></div>';
+      }
+      chips.push({
+        ci: ci, y: my, many: many, bg: bg, tx: tx, col: col,
+        label: many ? (c.items.length + " " + c.side + " &middot; " + qty + "%")
+                    : (c.side + " " + S(c.items[0].o.price) + " &middot; " + qty + "%")
+      });
+    });
+
+    chips.sort(function(a,b){ return a.y - b.y; });
+    var prev = -1e9;
+    chips.forEach(function(ch){ ch.cy = Math.max(ch.y, prev + THRESH); prev = ch.cy; });
+    for (var j = chips.length - 1; j >= 0; j--){
+      if (chips[j].cy > CH - 12) chips[j].cy = CH - 12;
+      if (j > 0 && chips[j].cy - chips[j-1].cy < THRESH) chips[j-1].cy = chips[j].cy - THRESH;
+    }
+    chips.forEach(function(ch){
+      if (ch.cy < 12) ch.cy = 12;
+      if (Math.abs(ch.cy - ch.y) > 3){
+        plot += '<div style="position:absolute;right:14px;top:'+Math.min(ch.y,ch.cy)+'px;height:'+Math.abs(ch.cy-ch.y)
+             +'px;width:1px;background:'+ch.col+';opacity:.5"></div>';
+      }
+      plot += '<div class="chip" data-c="'+ch.ci+'" style="top:'+ch.cy+'px;background:'+ch.bg+';color:'+ch.tx+';border-color:'+ch.col+'">'
+           + ch.label + (ch.many ? " &rsaquo;" : "") + '</div>';
+    });
+
+    var uk = 0, dk = 0;
+    ["TP","SL"].forEach(function(s){
+      var tx = s === "TP" ? GREENTX : REDTX;
+      var a = off.up[s];
+      if (a.n){ plot += '<div class="edge" style="top:'+(PAD + uk*17)+'px;color:'+tx+'">&uarr; '+a.n+" "+s+" &middot; "+a.q+'%</div>'; uk++; }
+      var b = off.dn[s];
+      if (b.n){ plot += '<div class="edge" style="bottom:'+(PAD + dk*17)+'px;color:'+tx+'">&darr; '+b.n+" "+s+" &middot; "+b.q+'%</div>'; dk++; }
+    });
+
+    var rail = '<div style="position:absolute;left:0;right:0;top:'+((RTOP-top)/(RTOP-RBOT)*CH)+'px;height:'
+             + Math.max(3, range/(RTOP-RBOT)*CH) + 'px;background:#fff;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)"></div>';
+    orders.forEach(function(o){
+      rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-o.price)/(RTOP-RBOT)*CH)+'px;height:2px;background:'+(o.side==="TP"?GREEN:RED)+'"></div>';
+    });
+    rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-MARK)/(RTOP-RBOT)*CH)+'px;height:2px;background:#1F6BFF"></div>';
+
+    var steps = [10e6,25e6,50e6,100e6,200e6], st = steps[steps.length-1];
+    for (var s = 0; s < steps.length; s++){ if (range/steps[s] <= 6){ st = steps[s]; break; } }
+    var axis = "";
+    for (var t = Math.ceil(bot/st)*st; t <= top; t += st){
+      axis += '<div style="top:'+y(t)+'px">'+F(t)+'</div>';
+    }
+
+    var taxis = "";
+    for (var b = i0; b <= i1; b++){
+      if (cd[b].m % 15 !== 0) continue;
+      var tx = b*BS - scrollX;
+      if (tx < 14 || tx > PW - 14) continue;
+      taxis += '<span style="left:'+tx+'px">'+hhmm(cd[b].m)+'</span>';
+    }
+    if (!homed) taxis += '<div class="latest" id="latest" title="Kembali ke harga mark dan bar terkini">&rsaquo;| terkini</div>';
+
+    cbox.innerHTML = '<div class="plot">'+plot+'</div><div class="rail">'+rail+'</div><div class="axis">'+axis
+                   + '</div><div class="taxis">'+taxis+'</div>';
+    var lb = document.getElementById("latest");
+    if (lb) lb.onclick = function(e){ e.stopPropagation(); scrollX = HOME; centerP = MARK; render(); };
+
+    var sizes = clusters.map(function(c){ return c.items.length; });
+    var maxc = Math.max.apply(null, sizes.concat([0]));
+    var tpc = clusters.filter(function(c){ return c.side==="TP"; }).length;
+    var slc = clusters.filter(function(c){ return c.side==="SL"; }).length;
+    var name, why;
+    if (maxc <= 1){ name = "Tier 1: resolved"; why = "every gap is 24px or more, so each order gets its own label and can be dragged directly."; }
+    else if (tpc <= 1 && slc <= 1 && vis.length > 2 && offN === 0){ name = "Tier 3: collapsed"; why = "each side is one chip. the density rail is now the only proof that nothing was dropped."; }
+    else { name = "Tier 2: clustered"; why = "some groups are merged. every line is still drawn at 40% opacity so the shape of the ladder survives."; }
+    document.getElementById("tiername").textContent = name;
+    document.getElementById("tierwhy").textContent = why;
+
+    drawBottom();
+    Array.prototype.forEach.call(cbox.querySelectorAll(".chip"), function(el){
+      el.onclick = function(){
+        var ci = +el.getAttribute("data-c");
+        if (clusters[ci].items.length < 2) return;
+        openIdx = ci; drawBottom();
+      };
+    });
+  }
+
+  function drawBottom(){
+    var c = openIdx === null ? null : clusters[openIdx];
+    if (!c){
+      bottom.innerHTML =
+        '<div class="tfrow" style="font-size:12px;gap:12px"><span>MA</span><span>EMA</span><span>BOLL</span>'
+        + '<span class="on">VOL</span><span>RSI</span><span>MACD</span><span>KDJ</span></div>'
+        + '<div class="obar"><button style="background:var(--red)">Short</button>'
+        + '<div style="flex:1;text-align:center;border:1px solid var(--line2);border-radius:8px;padding:7px 0">'
+        + '<div style="font-size:13px;font-weight:600">0,05 BTC</div><div style="font-size:10px;color:var(--ink3)">Long &middot; 25x</div></div>'
+        + '<button style="background:var(--blue)">Long</button></div>';
+      return;
+    }
+    var isTP = c.side === "TP", bg = isTP ? GREENBG : REDBG, tx = isTP ? GREENTX : REDTX;
+    var rows = c.items.map(function(v){
+      return '<div class="row"><span class="badge '+(isTP?"b-tp":"b-sl")+'">'+v.o.side+'</span>'
+        + '<span class="p">'+F(v.o.price)+'</span>'
+        + '<span class="q">'+v.o.qty+'%</span>'
+        + '<span class="q" style="width:52px;text-align:right">'+pct(v.o.price)+'</span>'
+        + '<button class="mini">Ubah</button></div>';
+    }).join("");
+    bottom.innerHTML = '<div class="sheet"><div style="width:34px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 10px"></div>'
+      + '<div class="hd"><b>'+c.items.length+" order "+c.side+' di grup ini</b>'
+      + '<span><button class="mini" id="zf">Pisahkan</button> <button class="mini" id="cx">Tutup</button></span></div>'
+      + '<div style="font-size:11.5px;color:var(--ink3);margin-bottom:2px">Total '
+      + c.items.reduce(function(a,v){ return a+v.o.qty; },0) + '% dari posisi &middot; rata-rata '
+      + S(c.items.reduce(function(a,v){ return a+v.o.price*v.o.qty; },0)/c.items.reduce(function(a,v){ return a+v.o.qty; },0))
+      + '</div>' + rows + '</div>';
+    document.getElementById("cx").onclick = function(){ openIdx = null; drawBottom(); };
+    document.getElementById("zf").onclick = function(){
+      var gaps = [];
+      for (var i = 1; i < c.items.length; i++) gaps.push(Math.abs(c.items[i].o.price - c.items[i-1].o.price));
+      var mg = Math.min.apply(null, gaps);
+      zoom.value = Math.max(40, Math.min(620, Math.round(mg * CH / 40 / 1e6)));
+      openIdx = null; render();
+    };
+  }
+
+  zoom.addEventListener("input", function(){ openIdx = null; render(); });
+
+  var px0 = 0, py0 = 0, sx0 = 0, cp0 = 0;
+  cbox.addEventListener("pointerdown", function(e){
+    if (e.target.closest && (e.target.closest(".chip") || e.target.closest(".latest"))) return;
+    panning = true;
+    px0 = e.clientX; py0 = e.clientY; sx0 = scrollX; cp0 = centerP;
+    cbox.classList.add("grabbing");
+    if (cbox.setPointerCapture) { try { cbox.setPointerCapture(e.pointerId); } catch(err){} }
+    e.preventDefault();
+  });
+  window.addEventListener("pointermove", function(e){
+    if (!panning) return;
+    scrollX = sx0 - (e.clientX - px0);
+    centerP = cp0 + (e.clientY - py0) * (+zoom.value * 1000000) / CH;
+    render();
+  });
+  window.addEventListener("pointerup", function(){
+    if (!panning) return;
+    panning = false;
+    cbox.classList.remove("grabbing");
+  });
+  window.addEventListener("pointercancel", function(){ panning = false; cbox.classList.remove("grabbing"); });
+
+  render();
+})();
+</script>
+</body>
+</html>

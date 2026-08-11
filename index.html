@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crypto Futures: design prototypes</title>
+<style>
+:root{
+  --ink:#16181D; --mute:#5B6472; --line:#E7EAEF; --bg:#FFFFFF; --surf:#F6F8FA;
+  --blue:#1F6BFF; --blueBg:#EAF1FF; --green:#22AB63; --greenBg:#E7F6ED;
+  --purple:#6B3FD6; --purpleBg:#F1ECFD;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:780px; margin:0 auto; padding:56px 24px 80px}
+header{border-bottom:1px solid var(--line); padding-bottom:28px; margin-bottom:36px}
+.eyebrow{
+  font:600 11px/1 var(--mono); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--blue); background:var(--blueBg); display:inline-block;
+  padding:5px 9px; border-radius:5px; margin-bottom:16px;
+}
+h1{font-size:27px; line-height:1.25; letter-spacing:-.02em; margin:0 0 12px; font-weight:650}
+.sub{color:var(--mute); margin:0; max-width:60ch}
+h2{
+  font:600 11px/1 var(--mono); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--mute); margin:40px 0 14px;
+}
+h2:first-of-type{margin-top:0}
+a.card{
+  display:block; text-decoration:none; color:inherit;
+  border:1px solid var(--line); border-radius:11px; padding:18px 20px;
+  margin-bottom:12px; background:var(--bg);
+  transition:border-color .14s ease, background .14s ease, transform .14s ease;
+}
+a.card:hover{border-color:var(--blue); background:var(--surf); transform:translateY(-1px)}
+a.card:focus-visible{outline:2px solid var(--blue); outline-offset:2px}
+.ctitle{font-weight:600; font-size:16px; margin-bottom:5px; display:flex; align-items:center; gap:9px}
+.arrow{color:var(--blue); font-weight:400}
+.cdesc{color:var(--mute); font-size:14px; margin:0}
+.tags{margin-top:11px; display:flex; flex-wrap:wrap; gap:6px}
+.tag{
+  font:500 11px/1 var(--mono); letter-spacing:.02em; padding:4px 7px; border-radius:4px;
+  background:var(--surf); color:var(--mute); border:1px solid var(--line);
+}
+.tag.doc{background:var(--purpleBg); color:var(--purple); border-color:transparent}
+.tag.proto{background:var(--greenBg); color:var(--green); border-color:transparent}
+.note{
+  background:var(--surf); border:1px solid var(--line); border-radius:11px;
+  padding:16px 20px; color:var(--mute); font-size:14px; margin-top:36px;
+}
+.note strong{color:var(--ink); font-weight:600}
+footer{margin-top:44px; padding-top:20px; border-top:1px solid var(--line); color:var(--mute); font-size:13px}
+@media (max-width:520px){ .wrap{padding:36px 18px 60px} h1{font-size:23px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">Ajaib &middot; Crypto Futures</span>
+  <h1>Design prototypes and specs</h1>
+  <p class="sub">Working artefacts for the Futures trade experience. Each link is a self contained page: open it on a phone to test the interaction, or read it on desktop for the logic and handoff notes.</p>
+</header>
+
+<h2>Chart interaction</h2>
+
+<a class="card" href="tpsl-chart-lines/">
+  <div class="ctitle">Multiple TP/SL order lines on chart <span class="arrow">&rarr;</span></div>
+  <p class="cdesc">How to show an unlimited number of take profit and stop loss orders as horizontal chart lines without crowding. Density based clustering, three label tiers, off screen edge chips, and a density rail. Includes an interactive prototype of the BTCIDR-PERP chart tab, the full interaction rules, pseudocode, and the TradingView Advanced Charts constraints engineering will hit.</p>
+  <div class="tags">
+    <span class="tag doc">one pager</span>
+    <span class="tag proto">prototype</span>
+    <span class="tag">pseudocode</span>
+    <span class="tag">TradingView</span>
+    <span class="tag">one-way mode</span>
+  </div>
+</a>
+
+<h2>Leverage</h2>
+
+<a class="card" href="ubah-leverage/">
+  <div class="ctitle">Ubah Leverage bottom sheet <span class="arrow">&rarr;</span></div>
+  <p class="cdesc">Clickable prototype of the leverage adjustment sheet. Tests the conditional liquidation risk warning, which appears only when the selected leverage exceeds the current leverage, and the fixed sheet height that keeps the CTA from shifting.</p>
+  <div class="tags">
+    <span class="tag proto">prototype</span>
+    <span class="tag">1x&ndash;25x</span>
+    <span class="tag">conditional warning</span>
+  </div>
+</a>
+
+<div class="note">
+  <strong>Reading these as a reviewer.</strong> The grey control panels below each device frame are testing aids, not part of the design. They exist so you can push the prototype into states that are hard to reach otherwise, such as a specific leverage value or an extreme cluster of orders. Anything inside the phone frame is the actual proposal.
+</div>
+
+<footer>
+  Prototypes are static HTML with no backend. Prices and order data are synthetic.
+</footer>
+
+</div>
+</body>
+</html>
