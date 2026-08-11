@@ -149,8 +149,8 @@
   <div class="card">
     <h3 style="margin-top:0">Local constraints that shape this</h3>
     <ul class="sub" style="margin-left:18px">
-      <li>IDR prices are 13 characters (1.650.000.000), the widest labels in the industry</li>
-      <li>The price axis already eats 74 of 390pt of width</li>
+      <li>IDR prices run to 13 characters (1.650.000.000). Too wide to carry inside a pill, which is why price sits on the scale rather than being truncated</li>
+      <li>The price scale already reserves 74 of 390pt for exactly these numbers, so reusing it costs no new width. It does mean the scale becomes a second lane to arbitrate</li>
       <li>Touch, so no hover to disambiguate and a 44pt minimum target</li>
     </ul>
   </div>
