@@ -83,6 +83,8 @@
   .chartbox.grabbing{cursor:grabbing}
   .plot{position:absolute; inset:0 78px 18px 0; overflow:hidden}
   .rail{position:absolute; top:0; bottom:18px; right:74px; width:4px; overflow:hidden; background:#F2F4F7}
+  /* scoped variant: the rail slot stays reserved so plot geometry is identical between the two prototypes */
+  .chartbox.noedges .rail{display:none}
   .axis{position:absolute; top:0; bottom:18px; right:0; width:74px; border-left:1px solid var(--line); background:#fff}
   .taxis{position:absolute; left:0; right:0; bottom:0; height:18px; border-top:1px solid var(--line); background:#fff}
   .taxis span{position:absolute; top:3px; transform:translateX(-50%); font-family:var(--mono); font-size:8.5px; color:var(--ink3)}
@@ -207,7 +209,7 @@
 </div>
 
 <h2>4. Prototype</h2>
-<p>Built on the current BTCIDR-PERP chart tab. The scenario is a long with 6 TP and 3 SL orders, which is a realistic scale out ladder and already enough to break a naive implementation.</p>
+<p>Built on the current BTCIDR-PERP chart tab. The scenario is a long with 6 TP and 3 SL orders, which is a realistic scale out ladder and already enough to break a naive implementation. There are two builds below: <b>4a</b> is the full proposal, <b>4b</b> is the same clustering with off screen handling removed, for scoping the first release.</p>
 <ul>
   <li><b>Drag the chart</b> to pan. Horizontally it scrolls through time and the order lines stay pinned. Vertically it changes which orders are on screen, so clusters re-form and edge chips update live.</li>
   <li><b>Drag the zoom slider</b> to move through all three tiers.</li>
@@ -216,17 +218,19 @@
   <li><b>Return to centre</b> with the "terkini" control that appears on the time axis once you have panned away.</li>
 </ul>
 
-<div class="stage">
-  <div class="phone" id="phone"></div>
+<h3>4a. Full version</h3>
+
+<div class="stage" data-edges="1">
+  <div class="phone js-phone"></div>
   <div class="panel">
     <div class="ctl">
-      <label for="zoom">Chart zoom (visible price range)</label>
-      <input type="range" id="zoom" min="40" max="620" step="5" value="220" />
-      <div class="tier"><span id="zoomval"></span> · <span id="ppu"></span></div>
-      <div class="tier" id="panstate" style="margin-top:2px"></div>
+      <label>Chart zoom (visible price range)</label>
+      <input type="range" class="js-zoom" min="40" max="620" step="5" value="220" />
+      <div class="tier"><span class="js-zoomval"></span> · <span class="js-ppu"></span></div>
+      <div class="tier js-panstate" style="margin-top:2px"></div>
       <div class="tier" style="margin-top:8px;color:var(--ink3)">Drag the chart to pan. Vertical pan changes which orders are on screen and recomputes clusters live. Horizontal pan never moves an order line.</div>
-      <div style="margin-top:12px" class="tierName" id="tiername"></div>
-      <div class="tier" id="tierwhy"></div>
+      <div style="margin-top:12px" class="tierName js-tiername"></div>
+      <div class="tier js-tierwhy"></div>
       <div class="legend">
         <div><i style="border-top:2px dashed var(--green)"></i>TP order line</div>
         <div><i style="border-top:2px dashed var(--red)"></i>SL order line</div>
@@ -237,6 +241,44 @@
       </div>
     </div>
   </div>
+</div>
+
+<h3>4b. Reduced scope: clustering only</h3>
+<p>Same clustering rule, same pills, same price scale badges. What is removed is everything that accounts for orders <b>outside</b> the viewport: the edge chips at the top and bottom of the plot, and the density rail. Both are answers to "is there something I cannot see", which is a different question from "these labels are on top of each other".</p>
+<p>The two prototypes share one scenario and one zoom range, so put them side by side and drive them to the same state. <b>The instructive move is the vertical pan.</b> Drag an SL below the bottom of the plot in each. The full version leaves a chip that keeps the order in the count; this one lets it leave without a trace, and the position looks less protected than it is. That is the actual cost of the cut, and it is a cost that only shows up when the trader is zoomed in, which is also when they are most likely to be managing risk.</p>
+
+<div class="stage">
+  <div class="phone js-phone"></div>
+  <div class="panel">
+    <div class="ctl">
+      <label>Chart zoom (visible price range)</label>
+      <input type="range" class="js-zoom" min="40" max="620" step="5" value="220" />
+      <div class="tier"><span class="js-zoomval"></span> · <span class="js-ppu"></span></div>
+      <div class="tier js-panstate" style="margin-top:2px"></div>
+      <div class="tier" style="margin-top:8px;color:var(--ink3)">Pan vertically until an order leaves the plot. Nothing marks its departure, and no tier readout mentions it.</div>
+      <div style="margin-top:12px" class="tierName js-tiername"></div>
+      <div class="tier js-tierwhy"></div>
+      <div class="tier js-offwarn" style="margin-top:8px;color:var(--amber)"></div>
+      <div class="legend">
+        <div><i style="border-top:2px dashed var(--green)"></i>TP order line</div>
+        <div><i style="border-top:2px dashed var(--red)"></i>SL order line</div>
+        <div><i style="border-top:2px solid #1F6BFF"></i>Position line (anchor, never collapses)</div>
+        <div><i style="border-top:2px solid var(--amber)"></i>Liquidation price (anchor, never collapses)</div>
+        <div><i style="border-top:2px dashed #3A4250"></i>Mark price</div>
+        <div><i style="border-top:2px solid #3A4250;opacity:.35"></i>Price scale badge, priority: liq &gt; mark &gt; position &gt; orders</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="call">
+  <p><b>What survives the cut, and why that makes it shippable</b></p>
+  <p class="sub">Clustering is self contained: it reads the y positions it already has and merges them. It needs no new state, no knowledge of the full order book, and no second render pass. Off screen accounting needs the opposite, an awareness of orders the chart is not drawing, which is where the TradingView coordinate work and the rAF dirty check are spent. So the cut is along a real seam rather than a convenience. Ship 4b, then add edge chips and the rail as a follow up without touching the clustering code.</p>
+</div>
+
+<div class="call warn">
+  <p><b>The one case where 4b is not merely reduced but wrong</b></p>
+  <p class="sub">The liquidation line. When it pans off screen, the reduced version removes the trader's only on chart reference for how much room is left, and unlike a TP that is a safety signal rather than a convenience. If 4b ships first, the anchors (position, liquidation, mark) should keep an edge chip even though the orders do not. That is a fixed number of chips, three at most, so it costs none of the density logic being deferred.</p>
 </div>
 
 <div class="call warn">
@@ -282,6 +324,7 @@
 
 <h3>Off screen orders</h3>
 <p>Edge chips (<span class="badge b-sl">&darr; 2 SL · 0,03 BTC</span>) plus the density rail keep the whole ladder accounted for when the viewport only holds part of it. One chip <b>per side per edge</b>, never one merged chip: pan far enough and both TP and SL can end up above the fold at once, and a single chip would have to lie about the side. Absolute quantities make these chips additive with the on screen pills, so the totals reconcile by inspection, which is the arithmetic a percentage share quietly prevented.</p>
+<p>This is the part that is separable, and prototype <b>4b</b> shows what the product looks like without it. Clustering answers "these labels overlap"; off screen accounting answers "is there something I cannot see". Both are real, only the first is caused by density, and only the first has to ship for the chart to stop breaking. The one exception is the liquidation line, which should keep an edge chip in any release, since a trader losing sight of it is a safety problem rather than a legibility one.</p>
 <p>The invariant the whole pattern rests on was checked rather than eyeballed: across 2.673 combinations of zoom range and vertical pan position, every quantity is accounted for in exactly one pill or edge chip, no two pills sit closer than 24px, no two price badges share a 15px band, and no pill escapes the lane.</p>
 
 <h2>6. Pseudocode</h2>
@@ -471,8 +514,6 @@
   var POSU = 50;
   var MARK = 1628000000, ENTRY = 1600000000, LIQ = 1451000000;
   var RTOP = 1780000000, RBOT = 1420000000;
-  var HOME = (NB-1)*BS - PW + 14;
-  var scrollX = HOME, centerP = MARK, panning = false;
   var GREEN = "#22AB63", GREENBG = "#E7F6ED", GREENTX = "#12693D";
   var RED = "#EA5350", REDBG = "#FDECEB", REDTX = "#9E2B28";
 
@@ -508,7 +549,14 @@
   function R(v){ return (v < 0 ? "-Rp" : "+Rp") + Math.abs(Math.round(v)).toLocaleString("id-ID"); }
   function pnl(price, u){ return (price - ENTRY) * (u/1000); }
 
-  var phone = document.getElementById("phone");
+  // one factory, mounted once per stage. opts.edges toggles off screen accounting
+  // (edge chips + density rail) so the two prototypes differ only in that scope.
+  function mount(stage, opts){
+  function q(sel){ return stage.querySelector(sel); }
+  var HOME = (NB-1)*BS - PW + 14;
+  var scrollX = HOME, centerP = MARK, panning = false;
+
+  var phone = q(".js-phone");
   phone.innerHTML =
     '<div class="sbar"><span>9:41</span><span style="letter-spacing:1px">&#9679;&#9679;&#9679;</span></div>'
     + '<div class="tabs"><span>Spot</span><b>Futures</b><span>Saham AS</span><span>Options</span></div>'
@@ -519,13 +567,13 @@
     + '<div class="subtabs"><span>Trade</span><b>Chart</b><span>Posisi</span><span>Order</span><span>Margin</span></div>'
     + '<div class="tfrow"><span class="on">1m</span><span>15m</span><span>1h</span><span>1D</span>'
     + '<span>Lainnya</span><span style="margin-left:auto">Depth</span></div>'
-    + '<div class="chartbox" id="cbox"></div>'
-    + '<div id="bottom"></div>'
+    + '<div class="chartbox js-cbox' + (opts.edges ? '' : ' noedges') + '"></div>'
+    + '<div class="js-bottom"></div>'
     + '<div class="nav"><div>Spot</div><div>Futures</div><div class="on">Trade</div><div>Saham AS</div><div>Feed</div><div>Portfolio</div></div>';
 
-  var cbox = document.getElementById("cbox");
-  var bottom = document.getElementById("bottom");
-  var zoom = document.getElementById("zoom");
+  var cbox = q(".js-cbox");
+  var bottom = q(".js-bottom");
+  var zoom = q(".js-zoom");
   var clusters = [], openIdx = null;
 
   function render(){
@@ -538,10 +586,10 @@
     function y(p){ return (top - p) / range * CH; }
     var ppu = CH / range;
 
-    document.getElementById("zoomval").textContent = "range " + F(range/1e6) + " juta";
-    document.getElementById("ppu").textContent = F(range/CH/1e3) + " ribu per px";
+    q(".js-zoomval").textContent = "range " + F(range/1e6) + " juta";
+    q(".js-ppu").textContent = F(range/CH/1e3) + " ribu per px";
     var homed = Math.abs(scrollX - HOME) < 1 && Math.abs(centerP - MARK) < range * 0.02;
-    document.getElementById("panstate").textContent =
+    q(".js-panstate").textContent =
       "pusat " + F(centerP) + " · " + Math.round((HOME - scrollX)/BS) + " bar dari terkini"
       + (homed ? "" : " · belum terpusat");
 
@@ -677,21 +725,25 @@
            + '</div>';
     });
 
-    var uk = 0, dk = 0;
-    ["TP","SL"].forEach(function(s){
-      var tx = s === "TP" ? GREENTX : REDTX;
-      var a = off.up[s];
-      if (a.n){ plot += '<div class="edge" style="top:'+(PAD + uk*17)+'px;color:'+tx+'">&uarr; '+a.n+" "+s+" &middot; "+Q(a.q)+'</div>'; uk++; }
-      var b = off.dn[s];
-      if (b.n){ plot += '<div class="edge" style="bottom:'+(PAD + dk*17)+'px;color:'+tx+'">&darr; '+b.n+" "+s+" &middot; "+Q(b.q)+'</div>'; dk++; }
-    });
+    // off screen accounting. absent in the reduced scope build, which is the whole difference.
+    var rail = "";
+    if (opts.edges){
+      var uk = 0, dk = 0;
+      ["TP","SL"].forEach(function(s){
+        var tx = s === "TP" ? GREENTX : REDTX;
+        var a = off.up[s];
+        if (a.n){ plot += '<div class="edge" style="top:'+(PAD + uk*17)+'px;color:'+tx+'">&uarr; '+a.n+" "+s+" &middot; "+Q(a.q)+'</div>'; uk++; }
+        var b = off.dn[s];
+        if (b.n){ plot += '<div class="edge" style="bottom:'+(PAD + dk*17)+'px;color:'+tx+'">&darr; '+b.n+" "+s+" &middot; "+Q(b.q)+'</div>'; dk++; }
+      });
 
-    var rail = '<div style="position:absolute;left:0;right:0;top:'+((RTOP-top)/(RTOP-RBOT)*CH)+'px;height:'
-             + Math.max(3, range/(RTOP-RBOT)*CH) + 'px;background:#fff;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)"></div>';
-    orders.forEach(function(o){
-      rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-o.price)/(RTOP-RBOT)*CH)+'px;height:2px;background:'+(o.side==="TP"?GREEN:RED)+'"></div>';
-    });
-    rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-MARK)/(RTOP-RBOT)*CH)+'px;height:2px;background:#1F6BFF"></div>';
+      rail = '<div style="position:absolute;left:0;right:0;top:'+((RTOP-top)/(RTOP-RBOT)*CH)+'px;height:'
+           + Math.max(3, range/(RTOP-RBOT)*CH) + 'px;background:#fff;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)"></div>';
+      orders.forEach(function(o){
+        rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-o.price)/(RTOP-RBOT)*CH)+'px;height:2px;background:'+(o.side==="TP"?GREEN:RED)+'"></div>';
+      });
+      rail += '<div style="position:absolute;left:0;right:0;top:'+((RTOP-MARK)/(RTOP-RBOT)*CH)+'px;height:2px;background:#1F6BFF"></div>';
+    }
 
     var steps = [10e6,25e6,50e6,100e6,200e6], st = steps[steps.length-1];
     for (var s = 0; s < steps.length; s++){ if (range/steps[s] <= 6){ st = steps[s]; break; } }
@@ -712,11 +764,11 @@
       if (tx < 14 || tx > PW - 14) continue;
       taxis += '<span style="left:'+tx+'px">'+hhmm(cd[b].m)+'</span>';
     }
-    if (!homed) taxis += '<div class="latest" id="latest" title="Kembali ke harga mark dan bar terkini">&rsaquo;| terkini</div>';
+    if (!homed) taxis += '<div class="latest" title="Kembali ke harga mark dan bar terkini">&rsaquo;| terkini</div>';
 
     cbox.innerHTML = '<div class="plot">'+plot+'</div><div class="rail">'+rail+'</div><div class="axis">'+axis
                    + '</div><div class="taxis">'+taxis+'</div>';
-    var lb = document.getElementById("latest");
+    var lb = cbox.querySelector(".latest");
     if (lb) lb.onclick = function(e){ e.stopPropagation(); scrollX = HOME; centerP = MARK; render(); };
 
     var sizes = clusters.map(function(c){ return c.items.length; });
@@ -726,10 +778,22 @@
     var name, why;
     if (forced){ name = "Tier 3: collapsed, by lane capacity"; why = "more chips than the " + CAP + " the lane can hold, so proximity is overruled and each side becomes one chip."; }
     else if (maxc <= 1){ name = "Tier 1: resolved"; why = "every gap is 24px or more, so each order gets its own label, its own price badge on the scale, and can be dragged directly."; }
-    else if (tpc <= 1 && slc <= 1 && vis.length > 2 && offN === 0){ name = "Tier 3: collapsed"; why = "each side is one chip. the density rail is now the only proof that nothing was dropped."; }
+    else if (tpc <= 1 && slc <= 1 && vis.length > 2 && offN === 0){
+      name = "Tier 3: collapsed";
+      why = opts.edges
+        ? "each side is one chip. the density rail is now the only proof that nothing was dropped."
+        : "each side is one chip. the merged lines at 40% opacity are the only proof that nothing was dropped.";
+    }
     else { name = "Tier 2: clustered"; why = "some groups are merged. every line is still drawn at 40% opacity so the shape of the ladder survives."; }
-    document.getElementById("tiername").textContent = name;
-    document.getElementById("tierwhy").textContent = why;
+    q(".js-tiername").textContent = name;
+    q(".js-tierwhy").textContent = why;
+    // the reduced build cannot show this on the chart. the panel says it so a reviewer
+    // can see exactly what information the scope cut removes.
+    var ow = q(".js-offwarn");
+    if (ow) ow.textContent = offN
+      ? offN + " order" + (offN>1?"s":"") + " off screen and unaccounted for, worth "
+        + Q(orders.reduce(function(a,o){ return a + (y(o.price) < PAD || y(o.price) > CH - PAD ? o.qty : 0); },0))
+      : "";
 
     drawBottom();
     Array.prototype.forEach.call(cbox.querySelectorAll(".chip"), function(el){
@@ -765,7 +829,7 @@
     }).join("");
     bottom.innerHTML = '<div class="sheet"><div style="width:34px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 10px"></div>'
       + '<div class="hd"><b>'+c.items.length+" order "+c.side+' di grup ini</b>'
-      + '<span><button class="mini" id="zf">Pisahkan</button> <button class="mini" id="cx">Tutup</button></span></div>'
+      + '<span><button class="mini js-zf">Pisahkan</button> <button class="mini js-cx">Tutup</button></span></div>'
       + '<div style="font-size:11.5px;color:var(--ink3);margin-bottom:2px">Grup ini '
       + Q(gq) + ' &middot; rata-rata '
       + F(c.items.reduce(function(a,v){ return a+v.o.price*v.o.qty; },0)/gq)
@@ -774,8 +838,8 @@
       + c.side + ' menutup ' + Q(sq) + ' dari ' + Q(POSU) + ' posisi'
       + (sq < POSU ? ' &middot; ' + Q(POSU - sq) + ' belum terlindungi' : '')
       + '</div>' + rows + '</div>';
-    document.getElementById("cx").onclick = function(){ openIdx = null; drawBottom(); };
-    document.getElementById("zf").onclick = function(){
+    bottom.querySelector(".js-cx").onclick = function(){ openIdx = null; drawBottom(); };
+    bottom.querySelector(".js-zf").onclick = function(){
       var gaps = [];
       for (var i = 1; i < c.items.length; i++) gaps.push(Math.abs(c.items[i].o.price - c.items[i-1].o.price));
       var mg = Math.min.apply(null, gaps);
@@ -809,6 +873,12 @@
   window.addEventListener("pointercancel", function(){ panning = false; cbox.classList.remove("grabbing"); });
 
   render();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".stage"), function(st){
+    if (!st.querySelector(".js-phone")) return;
+    mount(st, { edges: st.getAttribute("data-edges") === "1" });
+  });
 })();
 </script>
 </body>
